@@ -1,0 +1,16 @@
+Data Processing Report
+============================
+Date and time: 2025-05-16 15:57:12
+
+Operation: Merge (left)
+Left DataFrame: Book1.csv
+Right DataFrame: 04_optimo_routes.xlsx
+Merge keys: ABS Custumer no=Location ID
+
+Result shape: 885 rows × 60 columns
+Result columns: ABS Custumer no, Route Number, Full address, Service, DeliveryQty, Net Weight, latitude, longitude, formatted_address, geocode_confidence, cluster_id, cluster_name, distance_to_depot_km, depot_latitude, depot_longitude, depot_formatted_address, depot_geocode_confidence, main_route_no, delivery_weekday, service_time_min, total_net_weight_per_route, total_distance_per_route, total_time_per_route, delivery_time_window, route_id, route_position, route_distance_from_last_stop, travel_time_from_last_stop, new_total_distance_per_route, new_total_time_per_route, Order ID, Order Type, Date, Due date, Driver Serial Number, Driver, Vehicle, Vehicle Label, Stop Number, Location ID, Location, Address, Customer ID, Customer, Email, Phone, Route date, Scheduled at, Duration, Time Window, Weight, Service type, Legacy Route number, Notes, Latitude, Longitude, Arrival Time, Travel Time, Travel Time [sec], Distance [km]
+
+Missing values: 14160
+Columns with missing values: delivery_time_window, route_id, route_position, route_distance_from_last_stop, travel_time_from_last_stop, new_total_distance_per_route, new_total_time_per_route, Due date, Vehicle, Vehicle Label, Customer ID, Customer, Email, Phone, Time Window, Notes
+
+Output file: C:\Users\User\Dropbox\Personal\CareerFoundry\06 Sourcing data\Notebook folder\02 Data\01_processed_data\05_merged_data\05_merged_data.csv

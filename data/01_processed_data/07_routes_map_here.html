@@ -1,0 +1,767 @@
+
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="utf-8">
+        <title>Estonia Delivery Routes</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <!-- Include all required HERE maps libraries -->
+        <script src="https://js.api.here.com/v3/3.1/mapsjs-core.js"></script>
+        <script src="https://js.api.here.com/v3/3.1/mapsjs-service.js"></script>
+        <script src="https://js.api.here.com/v3/3.1/mapsjs-ui.js"></script>
+        <script src="https://js.api.here.com/v3/3.1/mapsjs-mapevents.js"></script>
+        <link rel="stylesheet" type="text/css" href="https://js.api.here.com/v3/3.1/mapsjs-ui.css" />
+        <style>
+            body, html { height: 100%; margin: 0; padding: 0; font-family: Arial, sans-serif; }
+            #container { display: flex; height: 100%; }
+            #map-container { flex: 1; height: 100%; }
+
+            /* Sidebar styles - matching the image */
+            #sidebar { 
+                width: 300px; 
+                height: 100%; 
+                overflow-y: auto; 
+                background-color: #f8f8f8;
+                border-left: 1px solid #ddd;
+                display: flex;
+                flex-direction: column;
+            }
+
+            /* Routes header */
+            #sidebar-header {
+                background-color: #333;
+                color: white;
+                padding: 10px 15px;
+                font-weight: bold;
+                font-size: 16px;
+            }
+
+            /* Route card styles */
+            .route-card {
+                margin: 0;
+                border-bottom: 1px solid #eee;
+            }
+
+            .route-header {
+                padding: 10px 15px;
+                color: white;
+                font-weight: bold;
+            }
+
+            .route-content {
+                padding: 10px 15px;
+                font-size: 14px;
+            }
+
+            .route-content p {
+                margin: 5px 0;
+            }
+
+            .here-link {
+                color: #0078D4;
+                text-decoration: none;
+            }
+
+            /* Legend styles */
+            #legend {
+                padding: 15px;
+                border-top: 1px solid #ddd;
+                margin-top: auto;
+            }
+
+            #legend h3 {
+                margin-top: 0;
+                margin-bottom: 10px;
+                font-size: 16px;
+            }
+
+            .legend-item {
+                display: flex;
+                align-items: center;
+                margin-bottom: 8px;
+            }
+
+            .legend-marker {
+                width: 20px;
+                height: 20px;
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                margin-right: 10px;
+                font-weight: bold;
+                font-size: 12px;
+                color: white;
+            }
+
+            .depot-marker {
+                background-color: white;
+                color: black;
+                border: 2px solid black;
+            }
+
+            .stop-marker {
+                background-color: #0078D4;
+                border: 2px solid white;
+            }
+
+            /* Status panel */
+            #status-panel {
+                position: absolute;
+                bottom: 10px;
+                left: 10px;
+                background: rgba(255,255,255,0.9);
+                padding: 10px;
+                border-radius: 5px;
+                max-width: 400px;
+                max-height: 150px;
+                overflow-y: auto;
+                z-index: 1000;
+                font-family: Arial, sans-serif;
+                font-size: 12px;
+                border: 1px solid #ddd;
+                box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            }
+
+            /* Tooltip styles - UPDATED for better readability */
+            .info-window {
+                max-width: 350px; 
+                min-width: 300px;
+                font-family: Arial, sans-serif;
+                padding: 10px;
+                line-height: 1.4;
+            }
+
+            .info-window h3 {
+                margin-top: 0;
+                border-bottom: 1px solid #ddd;
+                padding-bottom: 8px;
+                margin-bottom: 12px;
+                font-size: 16px;
+            }
+
+            .info-window p {
+                margin: 8px 0;
+                font-size: 13px;
+            }
+
+            .info-window .field-label {
+                font-weight: bold;
+                margin-right: 5px;
+                display: inline-block;
+                min-width: 80px;
+            }
+
+            .info-window .address-block {
+                margin-top: 12px;
+                margin-bottom: 12px;
+                padding-left: 85px;
+                position: relative;
+            }
+
+            .info-window .address-block .field-label {
+                position: absolute;
+                left: 0;
+            }
+
+            .info-window .tag {
+                display: inline-block;
+                background: #f0f0f0;
+                padding: 3px 8px;
+                border-radius: 4px;
+                font-size: 12px;
+                margin-right: 5px;
+                font-weight: bold;
+            }
+
+            /* Warning panel for unmapped routes */
+            #unmapped-panel {
+                position: absolute;
+                bottom: 200px;
+                left: 10px;
+                background: rgba(255, 249, 219, 0.95);
+                padding: 10px;
+                border-radius: 5px;
+                max-width: 400px;
+                max-height: 200px;
+                overflow-y: auto;
+                z-index: 1000;
+                font-family: Arial, sans-serif;
+                font-size: 12px;
+                border: 1px solid #ffcc00;
+                box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+                display: none;
+            }
+
+            #unmapped-panel h3 {
+                margin-top: 0;
+                margin-bottom: 8px;
+                font-size: 14px;
+                color: #b35900;
+            }
+
+            #unmapped-panel p {
+                margin: 5px 0;
+            }
+
+            #unmapped-panel .unmapped-list {
+                max-height: 120px;
+                overflow-y: auto;
+                border-top: 1px solid #ffe680;
+                padding-top: 5px;
+                margin-top: 5px;
+            }
+
+            #unmapped-panel .unmapped-item {
+                margin-bottom: 5px;
+            }
+
+            #unmapped-toggle {
+                position: absolute;
+                bottom: 175px;
+                left: 10px;
+                z-index: 1001;
+                padding: 5px 10px;
+                background: #ffcc00;
+                border: none;
+                border-radius: 3px;
+                cursor: pointer;
+                font-size: 12px;
+                font-weight: bold;
+            }
+        </style>
+    </head>
+    <body>
+        <div id="container">
+            <div id="map-container"></div>
+            <div id="sidebar">
+                <div id="sidebar-header">Routes</div>
+                <div id="route-list">
+                    <!-- Route details will be added here dynamically -->
+                </div>
+                <div id="legend">
+                    <h3>Legend</h3>
+                    <div class="legend-item">
+                        <div id="legend-depot-marker" class="legend-marker depot-marker">D</div>
+                        <span>Depot</span>
+                    </div>
+                    <div class="legend-item">
+                        <div id="legend-stop-marker" class="legend-marker stop-marker">1</div>
+                        <span>Stop</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div id="status-panel">Loading map...</div>
+        <button id="unmapped-toggle" style="display:none;">Show Unmapped Addresses</button>
+        <div id="unmapped-panel">
+            <h3>Unmapped Addresses</h3>
+            <p>The following locations could not be mapped:</p>
+            <div id="unmapped-list" class="unmapped-list">
+                <!-- Unmapped addresses will be added here -->
+            </div>
+        </div>
+
+        <script>
+            // Status panel for showing progress
+            const statusPanel = document.getElementById('status-panel');
+            function updateStatus(message) {
+                const timestamp = new Date().toLocaleTimeString();
+                statusPanel.innerHTML += "<br>" + timestamp + ": " + message;
+                statusPanel.scrollTop = statusPanel.scrollHeight;
+                console.log(message);
+            }
+
+            updateStatus("Initializing HERE Map...");
+
+            // Initialize the HERE Map
+            const apiKey = 'CFVnQcJE2RuoCpnt7mg7aNVpaXHG_S5dBd7MRRg7tGs';
+
+            // Initialize HERE Map
+            try {
+                const platform = new H.service.Platform({
+                    'apikey': apiKey
+                });
+
+                const defaultLayers = platform.createDefaultLayers();
+
+                // Create a map instance
+                const map = new H.Map(
+                    document.getElementById('map-container'),
+                    defaultLayers.vector.normal.map,
+                    {
+                        zoom: 7,
+                        center: { lat: 58.5953, lng: 25.0136 }  // Center of Estonia
+                    }
+                );
+
+                // Add UI controls and enable event system
+                const ui = H.ui.UI.createDefault(map, defaultLayers);
+                const mapEvents = new H.mapevents.MapEvents(map);
+                const behavior = new H.mapevents.Behavior(mapEvents);
+
+                updateStatus("Map initialized successfully");
+
+                // Create a group that will hold all objects on the map
+                const mapObjects = new H.map.Group();
+                map.addObject(mapObjects);
+
+                // Route data with all route information
+                const routeData = [{"id": "21", "color": "#6B98D6", "location": "Production LOO", "depot": {"lat": 59.43878, "lng": 24.9438, "name": "Depot", "address": "Depot Location", "is_offset": false}, "customers": [{"lat": 59.42035, "lng": 24.83914, "name": "94151899", "address": "Suur-S\u00f5jam\u00e4e p\u00f5ik 11, Lasnam\u00e4e, Tallinn, 11415 Harju Maakond, Eesti", "position": 1, "original_index": 0, "is_offset": false}, {"lat": 59.42068, "lng": 24.80111, "name": "94152635", "address": "L\u00f5\u00f5tsa 8a, Lasnam\u00e4e, Tallinn, 11415 Harju Maakond, Eesti", "position": 2, "original_index": 1, "is_offset": false}, {"lat": 59.41642, "lng": 24.7524, "name": "4512542", "address": "Viadukti 6, Kesklinn, Tallinn, 11313 Harju Maakond, Eesti", "position": 3, "original_index": 2, "is_offset": false}, {"lat": 59.41573, "lng": 24.7577, "name": "94002673", "address": "Viadukti 42, Kesklinn, Tallinn, 11313 Harju Maakond, Eesti", "position": 4, "original_index": 3, "is_offset": false}, {"lat": 59.40839, "lng": 24.73648, "name": "94153990", "address": "P\u00e4rnu maantee 139, Kesklinn, Tallinn, 11317 Harju Maakond, Eesti", "position": 5, "original_index": 4, "is_offset": false}, {"lat": 59.41824, "lng": 24.73775, "name": "94154524", "address": "Asula 5, Kesklinn, Tallinn, 11312 Harju Maakond, Eesti", "position": 6, "original_index": 5, "is_offset": false}, {"lat": 59.437, "lng": 24.7584, "name": "4591155", "address": "Narva maantee 2, Kesklinn, Tallinn, 10117 Harju Maakond, Eesti", "position": 7, "original_index": 6, "is_offset": false}, {"lat": 59.44057, "lng": 24.76206, "name": "94151975", "address": "Ahtri 9, Kesklinn, Tallinn, 10151 Harju Maakond, Eesti", "position": 8, "original_index": 7, "is_offset": false}, {"lat": 59.44419, "lng": 24.74287, "name": "94019857", "address": "P\u00f5hja puiestee 17, P\u00f5hja-Tallinn, Tallinn, 10414 Harju Maakond, Eesti", "position": 9, "original_index": 8, "is_offset": false}, {"lat": 59.43683, "lng": 24.71938, "name": "94155772", "address": "Ristiku 12, P\u00f5hja-Tallinn, Tallinn, 10611 Harju Maakond, Eesti", "position": 10, "original_index": 9, "is_offset": false}, {"lat": 59.43311, "lng": 24.75192, "name": "3993704", "address": "Estonia puiestee 9, Kesklinn, Tallinn, 10143 Harju Maakond, Eesti", "position": 11, "original_index": 10, "is_offset": false}, {"lat": 59.43242, "lng": 24.76172, "name": "3844807", "address": "Liivalaia 53, Kesklinn, Tallinn, 10145 Harju Maakond, Eesti", "position": 12, "original_index": 11, "is_offset": false}, {"lat": 59.39891, "lng": 24.79765, "name": "3916359", "address": "Kopli tee 26, Peetri, Rae, 75312 Harju Maakond, Eesti", "position": 13, "original_index": 12, "is_offset": false}, {"lat": 59.39846, "lng": 24.79762, "name": "3890081", "address": "Kopli tee 28, Peetri, Rae, 75312 Harju Maakond, Eesti", "position": 14, "original_index": 13, "is_offset": false}, {"lat": 59.39788, "lng": 24.79662, "name": "3824005", "address": "Kopli tee 32, Peetri, Rae, 75312 Harju Maakond, Eesti", "position": 15, "original_index": 14, "is_offset": false}, {"lat": 59.39731, "lng": 24.79753, "name": "3682115", "address": "Kopli tee 36, Peetri, Rae, 75312 Harju Maakond, Eesti", "position": 16, "original_index": 15, "is_offset": false}, {"lat": 59.39643, "lng": 24.7973, "name": "3642198", "address": "Kopli tee 40, Peetri, Rae, 75312 Harju Maakond, Eesti", "position": 17, "original_index": 16, "is_offset": false}, {"lat": 59.39637, "lng": 24.79625, "name": "3615962", "address": "K\u00fcti tee 30, Peetri, Rae, 75312 Harju Maakond, Eesti", "position": 18, "original_index": 17, "is_offset": false}, {"lat": 59.39681, "lng": 24.79635, "name": "3615967", "address": "K\u00fcti tee 30a, Peetri, Rae, 75312 Harju Maakond, Eesti", "position": 19, "original_index": 18, "is_offset": false}, {"lat": 59.39725, "lng": 24.79654, "name": "3684506", "address": "Kopli tee 34, Peetri, Rae, 75312 Harju Maakond, Eesti", "position": 20, "original_index": 19, "is_offset": false}, {"lat": 59.39141, "lng": 24.80246, "name": "3884002", "address": "J\u00e4rvep\u00f5llu tee 4, Peetri, Rae, 75304 Harju Maakond, Eesti", "position": 21, "original_index": 20, "is_offset": false}, {"lat": 59.39201, "lng": 24.80246, "name": "4558483", "address": "J\u00e4rvep\u00f5llu tee 4, Peetri, Rae, 75304 Harju Maakond, Eesti", "position": 22, "original_index": 21, "is_offset": true}, {"lat": 59.33876, "lng": 24.82764, "name": "4461479", "address": "Kangrumetsa tee 1, Kurna, Rae, 75307 Harju Maakond, Eesti", "position": 23, "original_index": 22, "is_offset": false}], "has_duplicate_coordinates": true, "segments": [{"start": {"lat": 59.43878, "lng": 24.9438, "name": "Depot", "address": "Depot Location", "is_offset": false}, "end": {"lat": 59.42035, "lng": 24.83914, "name": "94151899", "address": "Suur-S\u00f5jam\u00e4e p\u00f5ik 11, Lasnam\u00e4e, Tallinn, 11415 Harju Maakond, Eesti", "position": 1, "original_index": 0, "is_offset": false}, "segment_id": 0}, {"start": {"lat": 59.42035, "lng": 24.83914, "name": "94151899", "address": "Suur-S\u00f5jam\u00e4e p\u00f5ik 11, Lasnam\u00e4e, Tallinn, 11415 Harju Maakond, Eesti", "position": 1, "original_index": 0, "is_offset": false}, "end": {"lat": 59.42068, "lng": 24.80111, "name": "94152635", "address": "L\u00f5\u00f5tsa 8a, Lasnam\u00e4e, Tallinn, 11415 Harju Maakond, Eesti", "position": 2, "original_index": 1, "is_offset": false}, "segment_id": 1}, {"start": {"lat": 59.42068, "lng": 24.80111, "name": "94152635", "address": "L\u00f5\u00f5tsa 8a, Lasnam\u00e4e, Tallinn, 11415 Harju Maakond, Eesti", "position": 2, "original_index": 1, "is_offset": false}, "end": {"lat": 59.41642, "lng": 24.7524, "name": "4512542", "address": "Viadukti 6, Kesklinn, Tallinn, 11313 Harju Maakond, Eesti", "position": 3, "original_index": 2, "is_offset": false}, "segment_id": 2}, {"start": {"lat": 59.41642, "lng": 24.7524, "name": "4512542", "address": "Viadukti 6, Kesklinn, Tallinn, 11313 Harju Maakond, Eesti", "position": 3, "original_index": 2, "is_offset": false}, "end": {"lat": 59.41573, "lng": 24.7577, "name": "94002673", "address": "Viadukti 42, Kesklinn, Tallinn, 11313 Harju Maakond, Eesti", "position": 4, "original_index": 3, "is_offset": false}, "segment_id": 3}, {"start": {"lat": 59.41573, "lng": 24.7577, "name": "94002673", "address": "Viadukti 42, Kesklinn, Tallinn, 11313 Harju Maakond, Eesti", "position": 4, "original_index": 3, "is_offset": false}, "end": {"lat": 59.40839, "lng": 24.73648, "name": "94153990", "address": "P\u00e4rnu maantee 139, Kesklinn, Tallinn, 11317 Harju Maakond, Eesti", "position": 5, "original_index": 4, "is_offset": false}, "segment_id": 4}, {"start": {"lat": 59.40839, "lng": 24.73648, "name": "94153990", "address": "P\u00e4rnu maantee 139, Kesklinn, Tallinn, 11317 Harju Maakond, Eesti", "position": 5, "original_index": 4, "is_offset": false}, "end": {"lat": 59.41824, "lng": 24.73775, "name": "94154524", "address": "Asula 5, Kesklinn, Tallinn, 11312 Harju Maakond, Eesti", "position": 6, "original_index": 5, "is_offset": false}, "segment_id": 5}, {"start": {"lat": 59.41824, "lng": 24.73775, "name": "94154524", "address": "Asula 5, Kesklinn, Tallinn, 11312 Harju Maakond, Eesti", "position": 6, "original_index": 5, "is_offset": false}, "end": {"lat": 59.437, "lng": 24.7584, "name": "4591155", "address": "Narva maantee 2, Kesklinn, Tallinn, 10117 Harju Maakond, Eesti", "position": 7, "original_index": 6, "is_offset": false}, "segment_id": 6}, {"start": {"lat": 59.437, "lng": 24.7584, "name": "4591155", "address": "Narva maantee 2, Kesklinn, Tallinn, 10117 Harju Maakond, Eesti", "position": 7, "original_index": 6, "is_offset": false}, "end": {"lat": 59.44057, "lng": 24.76206, "name": "94151975", "address": "Ahtri 9, Kesklinn, Tallinn, 10151 Harju Maakond, Eesti", "position": 8, "original_index": 7, "is_offset": false}, "segment_id": 7}, {"start": {"lat": 59.44057, "lng": 24.76206, "name": "94151975", "address": "Ahtri 9, Kesklinn, Tallinn, 10151 Harju Maakond, Eesti", "position": 8, "original_index": 7, "is_offset": false}, "end": {"lat": 59.44419, "lng": 24.74287, "name": "94019857", "address": "P\u00f5hja puiestee 17, P\u00f5hja-Tallinn, Tallinn, 10414 Harju Maakond, Eesti", "position": 9, "original_index": 8, "is_offset": false}, "segment_id": 8}, {"start": {"lat": 59.44419, "lng": 24.74287, "name": "94019857", "address": "P\u00f5hja puiestee 17, P\u00f5hja-Tallinn, Tallinn, 10414 Harju Maakond, Eesti", "position": 9, "original_index": 8, "is_offset": false}, "end": {"lat": 59.43683, "lng": 24.71938, "name": "94155772", "address": "Ristiku 12, P\u00f5hja-Tallinn, Tallinn, 10611 Harju Maakond, Eesti", "position": 10, "original_index": 9, "is_offset": false}, "segment_id": 9}, {"start": {"lat": 59.43683, "lng": 24.71938, "name": "94155772", "address": "Ristiku 12, P\u00f5hja-Tallinn, Tallinn, 10611 Harju Maakond, Eesti", "position": 10, "original_index": 9, "is_offset": false}, "end": {"lat": 59.43311, "lng": 24.75192, "name": "3993704", "address": "Estonia puiestee 9, Kesklinn, Tallinn, 10143 Harju Maakond, Eesti", "position": 11, "original_index": 10, "is_offset": false}, "segment_id": 10}, {"start": {"lat": 59.43311, "lng": 24.75192, "name": "3993704", "address": "Estonia puiestee 9, Kesklinn, Tallinn, 10143 Harju Maakond, Eesti", "position": 11, "original_index": 10, "is_offset": false}, "end": {"lat": 59.43242, "lng": 24.76172, "name": "3844807", "address": "Liivalaia 53, Kesklinn, Tallinn, 10145 Harju Maakond, Eesti", "position": 12, "original_index": 11, "is_offset": false}, "segment_id": 11}, {"start": {"lat": 59.43242, "lng": 24.76172, "name": "3844807", "address": "Liivalaia 53, Kesklinn, Tallinn, 10145 Harju Maakond, Eesti", "position": 12, "original_index": 11, "is_offset": false}, "end": {"lat": 59.39891, "lng": 24.79765, "name": "3916359", "address": "Kopli tee 26, Peetri, Rae, 75312 Harju Maakond, Eesti", "position": 13, "original_index": 12, "is_offset": false}, "segment_id": 12}, {"start": {"lat": 59.39891, "lng": 24.79765, "name": "3916359", "address": "Kopli tee 26, Peetri, Rae, 75312 Harju Maakond, Eesti", "position": 13, "original_index": 12, "is_offset": false}, "end": {"lat": 59.39846, "lng": 24.79762, "name": "3890081", "address": "Kopli tee 28, Peetri, Rae, 75312 Harju Maakond, Eesti", "position": 14, "original_index": 13, "is_offset": false}, "segment_id": 13}, {"start": {"lat": 59.39846, "lng": 24.79762, "name": "3890081", "address": "Kopli tee 28, Peetri, Rae, 75312 Harju Maakond, Eesti", "position": 14, "original_index": 13, "is_offset": false}, "end": {"lat": 59.39788, "lng": 24.79662, "name": "3824005", "address": "Kopli tee 32, Peetri, Rae, 75312 Harju Maakond, Eesti", "position": 15, "original_index": 14, "is_offset": false}, "segment_id": 14}, {"start": {"lat": 59.39788, "lng": 24.79662, "name": "3824005", "address": "Kopli tee 32, Peetri, Rae, 75312 Harju Maakond, Eesti", "position": 15, "original_index": 14, "is_offset": false}, "end": {"lat": 59.39731, "lng": 24.79753, "name": "3682115", "address": "Kopli tee 36, Peetri, Rae, 75312 Harju Maakond, Eesti", "position": 16, "original_index": 15, "is_offset": false}, "segment_id": 15}, {"start": {"lat": 59.39731, "lng": 24.79753, "name": "3682115", "address": "Kopli tee 36, Peetri, Rae, 75312 Harju Maakond, Eesti", "position": 16, "original_index": 15, "is_offset": false}, "end": {"lat": 59.39643, "lng": 24.7973, "name": "3642198", "address": "Kopli tee 40, Peetri, Rae, 75312 Harju Maakond, Eesti", "position": 17, "original_index": 16, "is_offset": false}, "segment_id": 16}, {"start": {"lat": 59.39643, "lng": 24.7973, "name": "3642198", "address": "Kopli tee 40, Peetri, Rae, 75312 Harju Maakond, Eesti", "position": 17, "original_index": 16, "is_offset": false}, "end": {"lat": 59.39637, "lng": 24.79625, "name": "3615962", "address": "K\u00fcti tee 30, Peetri, Rae, 75312 Harju Maakond, Eesti", "position": 18, "original_index": 17, "is_offset": false}, "segment_id": 17}, {"start": {"lat": 59.39637, "lng": 24.79625, "name": "3615962", "address": "K\u00fcti tee 30, Peetri, Rae, 75312 Harju Maakond, Eesti", "position": 18, "original_index": 17, "is_offset": false}, "end": {"lat": 59.39681, "lng": 24.79635, "name": "3615967", "address": "K\u00fcti tee 30a, Peetri, Rae, 75312 Harju Maakond, Eesti", "position": 19, "original_index": 18, "is_offset": false}, "segment_id": 18}, {"start": {"lat": 59.39681, "lng": 24.79635, "name": "3615967", "address": "K\u00fcti tee 30a, Peetri, Rae, 75312 Harju Maakond, Eesti", "position": 19, "original_index": 18, "is_offset": false}, "end": {"lat": 59.39725, "lng": 24.79654, "name": "3684506", "address": "Kopli tee 34, Peetri, Rae, 75312 Harju Maakond, Eesti", "position": 20, "original_index": 19, "is_offset": false}, "segment_id": 19}, {"start": {"lat": 59.39725, "lng": 24.79654, "name": "3684506", "address": "Kopli tee 34, Peetri, Rae, 75312 Harju Maakond, Eesti", "position": 20, "original_index": 19, "is_offset": false}, "end": {"lat": 59.39141, "lng": 24.80246, "name": "3884002", "address": "J\u00e4rvep\u00f5llu tee 4, Peetri, Rae, 75304 Harju Maakond, Eesti", "position": 21, "original_index": 20, "is_offset": false}, "segment_id": 20}, {"start": {"lat": 59.39141, "lng": 24.80246, "name": "3884002", "address": "J\u00e4rvep\u00f5llu tee 4, Peetri, Rae, 75304 Harju Maakond, Eesti", "position": 21, "original_index": 20, "is_offset": false}, "end": {"lat": 59.39201, "lng": 24.80246, "name": "4558483", "address": "J\u00e4rvep\u00f5llu tee 4, Peetri, Rae, 75304 Harju Maakond, Eesti", "position": 22, "original_index": 21, "is_offset": true}, "segment_id": 21}, {"start": {"lat": 59.39201, "lng": 24.80246, "name": "4558483", "address": "J\u00e4rvep\u00f5llu tee 4, Peetri, Rae, 75304 Harju Maakond, Eesti", "position": 22, "original_index": 21, "is_offset": true}, "end": {"lat": 59.33876, "lng": 24.82764, "name": "4461479", "address": "Kangrumetsa tee 1, Kurna, Rae, 75307 Harju Maakond, Eesti", "position": 23, "original_index": 22, "is_offset": false}, "segment_id": 22}, {"start": {"lat": 59.33876, "lng": 24.82764, "name": "4461479", "address": "Kangrumetsa tee 1, Kurna, Rae, 75307 Harju Maakond, Eesti", "position": 23, "original_index": 22, "is_offset": false}, "end": {"lat": 59.43938, "lng": 24.9438, "name": "Depot", "address": "Depot Location", "is_offset": true}, "segment_id": 23}], "extracted_duration": null, "extracted_distance": null, "precalculated_polylines": [{"polyline": "BGq57rxDs8tyvB1G_WnL_nBnG7L_EzF7BvCU3InBnQ3I7fvH_Y7G7avMnuBnBvHT_EkDzZwC7BkD_E8B7GU3N4IzZsJjN4S_dw0B3zC0e3wBwtC37D0UvgB8uBrqC8anuBsJ3NwH3N4D8B8BAwCnBkDjDwCnG4I7G8G3IgFrJ0U7a8GnG4N3I0K3DkInB0FwCsTsEkIsE8GwMkD4NkD0F8B8B4D8B4DA4D7BkDrEoBjDwC_JU_JnBvH3D3I8BnpBwC_YTzFgF3X8LrnBwgBnxCgK3X8G3S0K3XkIzU8GvRsO3ckIrOoG_J0PzUgPnGgKkDkDwCsEoG8BsEwCsJoBgKAsJnBwMjI4SnLgP_iB8a_E4DjIsErEoB3IU3DT_EjD7GnG_J_TvC7GjDrJ7Lj1BjI7Q_ErY3c7yEvWvwDvH_nBnG7fvRn7CvH7kB7G3hBzFzezP3pCjIvlBvWvwDjNniCrOnnCnBnG3IvqBnL74BjIjrBvM79B7L36BzFnazP3uC7GnfjI7pB_ErYzFjcrY_8DzKv0BvM79B3I7uBzK31B_OrqC7L36BnVvmDnL74B_Y7-DjDnQrEjXn4Bv6Ij6BrhJrTvhD_JzyBnG7f_EjXvMz8BvCvMnG7f3I_sB3cvuE3I_sBzF3c3I3rBjInpB_E3XnkBj3F_EvW_E_YrTvhDnL74BrEjXzF7ajIjrBjDzPjDzPzUjnDvMrgCrJ7zB7G7QzFzerEvb3D7VrEzZ_EvbjNjuC_Evb_Eze_EvbnGriB3DjX_EjcvHztBnB7GnB7G3DvWrEnanGnkBUrO7GnpB_Jv5B3XjqEvHvvBjSroDrJn4BrE_YrOjzC3NvtCrE7anGvlB7G_nB7B_J7BrJ3DkDrEkDzF0FzK8L_JoL7GwHzPkSzF8GvCsE7B8LvCkD7QsY7G4I3N4NzK4IjhBwWvM4Ir7BsnB3I0FjSoL3gE44CnsCk1Bv0BokB3IoGjwB4hBnLwHvvB4hB3_B0tB7LoBjXsJ3SgKrnB0ZrToL7G7B7L7B3D7BrE3DrEzF3D7G3DrJjD_OAjiDUnkBT7GoB3NwHjrBgF3SsE7QsJvbwMjmBgF_OwCjIoarvCgPrsBgF_OwHvWkSr2Bwb3zC4IrYwC7GwRr2BkIjXoLjhBgF_O0KjhBsY8f4SsYkI8LkDoGsEgPoBkIAgKvCwqBjDkhBrJ04DvCsnBvH8lDpEw7B", "distance": 10612, "duration": 933}, {"polyline": "BGuh2qxDwyhsvBqEv7BwH7lDwCrnBsJz4DkDjhBwCvqBA_JnBjIrE_OjDnGjI7L3SrYrY7f4DnL4Ina0K7f0F7QwCvHgPnuBwH7V0FvR8B_EwCvHoQrxBkD_J4InagP_sB8GnVgF_O0Uz8B4DzKwHjIkD7GwHzU4IzegF_T0KvvBwHnkB8GzoBsEnkBwHjpCgProDwHn2CsErqCwCjkCUvjCoB_vC8BjoKA3SAzhCUngDAjhBAzZzFAriB4DnQA3IA_ETrdTjhBTTzFTvMrCjxB", "distance": 2565, "duration": 305}, {"polyline": "BGow4qxDwy3pvBsCkxBUwMU0FkhBUsdUgFU4IAoQAsiB3D0FAA3NTnf7BrJA_tDAz3BA3SAnaU7aAnaA7aArxBwCjNnBzkDUn9BAnG7BjIAr7BAjcUjwBwCnaU3mBU7tEA_ToBjxDjDr_EU7aTjcT_T7G3pC_EriB3I3wBnL_xB_xBj8FzUzrCvbnqD7Vv8C_J_nB3SvjC_JvlB_Tn2C7QnzBzPvlBvHzUvC3NArJoBnG0F_OoG3DgFjD8GzFwCrE8BvHAzF7B3IvCzFrE7B3DU7BoBjDgFzFsJ_EkIzZj4CnL3mBvbrjDjS_lC_E3SjIze7VrvC7L_7BjX3jFvCvbwC_2B", "distance": 3401, "duration": 338}, {"polyline": "BGgkwqxD024mvBvCg3BzK8G3SoV3NoQ7QoV_JsOrJgP3IoQnGsOU8BgjBgwCwHoL6Lua", "distance": 403, "duration": 68}, {"polyline": "BGi6uqxD6iinvB5LtavHnL_iB_vCT7BrE8L_Jge3DoL7LokB_EgPjI0ZT8BnBsE3D8LnLgjBnG0UzFsYnGvH_JnL_OvRvR_T3IzK3I3IjI3I3I3InfjhB7f_nB_Y7kBvHnG7QjcrYrxB3SnuBzP7pB3sD__J35E3gOnQvvB3NrnB7L_iBvMnkB3S31B3InavH_Y7B7G_EnV7G3cjD3NnGnarEzUUzKjDzPnGrdoBrJvCvb3Dnf7L75DA7GoBzF8GzKgPkNsEwC8GAgKgK8QgPwHwHoG0F8L8L4NsOoGoGsOkNoL0KgKgKkNwM8G8GwW4X4NsO8f8f4IsJoQoQ0ege8Q8QgZ4X8L8L4DoLgP4SoVoanG0UjhBkuCjhBsqCjNrYrT_iB8G_Ooa79B", "distance": 3591, "duration": 384}, {"polyline": "BGg8_pxD8o6lvBna89B7GgPsTgjBkNsYkhBrqCkhBjuCoGzUkSkS8Q8QkDkD8VwWkmB0jBwWkS4IkD0ZwM4IgFgjBgPsO0Fo4BwbsdoQsOwHsJ4D8VsJwgBsOkXgKkNvC8B7GoBzK8BzKA_EUnGvCnkBvHvlB3Ivb3InQ8Qn9BwHrTgK3hB4DzPgKkIwH0FgegZ8fofgegeuO8M", "distance": 1683, "duration": 251}, {"polyline": "BGitzqxD8n7lvBmasX4SkSsiBkhB8L4XvqB85DvMkmBvHkcjN3Iz3BvlBz3BrYoBzPgZ0KkgEw5BgPwH4D8B0FwC4IkDokB8QwM0F0FwCwgBsOgUwH8QsEoGoBwHoBoLU0PA0KA4NAkNAsEAsEAsTU4NA4cUsOA0UUgPAoGToLnB4IAkXAgUAkXT4IUgUTwWnBsOU8VToLoB8Q8BoGwCoLwH8GgFsEkD4IoGwHoG8QkNoGgFwH8GsO8Q4IkNkNwWoQofsEoGwH0F0FwC8GwCgU8Go4B8QsO8G8QkDkhB4D8GjDsE8B4IgFgUoLoQgP0P8VgKkSwbgyB4D8GkIsOgK8VkDsJ0K4cgK0eoV4_B0FoQ0U4_BwMokBoBkDwC4SwCoLoGoV4IoVsEwRoBsEkD4IwCkDoGkcwC0K8BwMoBgUoBwbU0UUsYA8QA0UA8QA0UAsnB", "distance": 3403, "duration": 571}, {"polyline": "BGwm4rxDgoknvBA0yBAwyCUoQ4IvMUr2BU_nBUjzCTzeT7LAzPnBj6BjDnVvCrsBnBvR7BvRA_JkDjX0FvMwCjDkDnBwCA4DoBwMkIoLoG0F7B4DkD8GsEsO0FsOwC4IUwMAge3DgerEwHnBgU_E8LjDkIoQ4D8QrJ4XjI0ZrEgPvHgZjDgK_JokBnG0U_EgU_EwWrE4XjDsTnG03BnB0ZnBofA8f0F4SwCsE4DU8BnBgFnGwCnGwH7pB8GoG0K4IoL4IoVwRsTgPzFwM3DgFTwRsEsTjDsJzFwM3DwHrEwHlHlP", "distance": 1696, "duration": 383}, {"polyline": "BG69-rxD6ornvBpPpgB3IwHnL4I3DwC3DoB3DU7BrTTjNA3N8BvgBwH7pBsJjwBgUr-CsE_Y8BrJ4DzUwHnpBwCzPsEnV4D7VwC_O8GvlB0F7V0FrO4D7G8GzK4DrEwH7GoGrEkNvH4SzF4InB4IAwboG8agFkDAsE7BkDjD0F7GgFjSwCvR8BrYoBjN8G_7B8Gv-BwCrdwCnawC3X4DvlBwCzUwCjSsTv2FkD3S7GzFvMnL3czZ4D7Q0Epa", "distance": 1519, "duration": 298}, {"polyline": "BG4vlsxD-zlmvBzEqa3D8Q_O3N7G7G3hBnfvMvM3D4I3D4IvMgZzKkSrE4I_E4I_E4D7BAvCT_E3DrT7zB3hB72CzKze7BzFvlBvhDjIzUzF3NvCvHvW_gCnGzU3DzKvHnV3NriB3DjIjNrdvHnQnLnVzP_YzKvMjS3SzKrJ_OnL3IvHriBzezF_EvHnGoBnaU3zCAzZUrsBUvlBnB3N3DvR3DnL3c3zC_O_sBgF3IsnB_vCoVvqBgF_Jsdv5BoG7LnL7VriB3kC_T3rBvWrsBzFvMwHUkIjNkX3mBwMtT", "distance": 2182, "duration": 343}, {"polyline": "BGos3rxDuz3kvBvMuTjX4mBjIkNvHTnB4ITwC3rB0yBvWwW_TsY7QgP3NoGsEsdgFkcsE4XgF8VwHkmB8GkhBkD4X8B4N8BsOoBgPgFkrBoB4N4D8pBwC4S8BkS8BwWoBwMkDgtBoB0eT0jBvC0oBnBgPvCkhBvCwgBAwRvCoB3DoB3D8BvH0F3NwM3N4NnpB8kBvHwH_nBsiBnL8L_EkIzF8LrE0K_JsdrJkcrEwMrEwM3DwHrEgPnGsT_J0jB3DgUvCwMTgKUwMkD4S4Noa4Nof4D0KoGkS4N4wBkI8f4SgmCoGgeoBkIgFg3BkD8zBoB8aoB0KT4NTgKT4IzFkzCAkIUgK4DoQkIwRoaouB8G8LoV0oB4DkI4DsJ0KgevM4XjD0KvCgF3DnLnGoLrJ0PnG0KvCoGnLgP", "distance": 2471, "duration": 456}, {"polyline": "BG00wrxDot4mvB_JgP3NwWzFrOrEoGzF4IjDsE0F4N4D4IkNwgBkI0UgFoLsnBg_CwC0KU4IoBwWUsiBoB8QA4NToLnB4S7B8f3DgjB3I_EzFzF_EvCzFT7BoBzF0F_JkInVgUnGkInL4D_YToB8VoB4IgFoQ4S4hB", "distance": 793, "duration": 182}, {"polyline": "BG8jvrxDwqpnvB3S3hB_EnQnB3InB7VvRT_EU3DnBUvM7BrJgF3IoG3IwHrOkI7Q4InVgUrxBkIjSsJ_TsErJgK8kB8BsJoVkzCToGjDsJ8BnB0FUgFwC0F0F4IgFnB0K7B0UzF4cjIwbvHoV_E4N7LwgB3IsYnGsTjNwlBzFsY7Lw0BvC0KjSo2CrEsTzFwb7Gof7B4IzK4rB7GwbnGwWnG0U7BwH7kBk9CnBkDnL8ajXs7B3D4IvCsJvC0KnLwb3DgKrJkXjI0UrJkXvW8zBzK4X3NsdjDkIjDoG3IkXvR0oBnGsOnBkDzFwMjI8QjI4S_EgKrO0enL4S7L8V3I0PvM4XzKwRnLwM_EoLjI8QjNgejDkInQgoBjIwRvRsnBzKsYrE8L3I4XjI4SzF8L3N0erJ8VjD8GrE4IvM0ZzKkS7G0KrJ8LzF4I_E0F7G0F3NgPnGkIrToa3IwMrE8GrEkIvlB8zBzeopBzKoQnf0tBzZ8kB7VgenVsdn2C0zD7pB84BnLgPjNwR3XsdrOwRzPsTrd0jB7QgUzFoG31Bg8BjmB0tBzoB0yB7uB08BrJwMvMwCjDA3DnB_E_E_JvWzF3S3I3XnGzPjI_O_EvH_JrJvRnLnQ_J_Y7Q_JvHzKrJvW_Y7QzU7avlB3S3c3XzejSjX_OrTjI_JzK3NjX7avW3X3SnQzK3IrTvR7fvbrTjSzKnL3SnVvlBztBnLzPzKzPjNjXnVvlBnG3I3IzKrE3D_JzFnB4XnB0K_d8gDzF0FjXU3DsE3DwH7Q8uB_Y4uCjNssB7Q03B7L4wBrEsT3S8xC_EsTrE0KjI0FrJT9KtC", "distance": 6019, "duration": 725}, {"polyline": "BG6rtpxD-hzpvBtcpG7LrEjXvHnLjDAvWgK4DwMsE", "distance": 196, "duration": 36}, {"polyline": "BG03rpxDo-xpvBvMrEA3NrE36B7BrO", "distance": 104, "duration": 19}, {"polyline": "BG8krpxDgjvpvB8BsOsE46BA4N_J3D_WzF", "distance": 140, "duration": 25}, {"polyline": "BGkqqpxDwwxpvBgX0FAwWnkBzKvbjIoB7V5PnF", "distance": 225, "duration": 52}, {"polyline": "BG6yopxD4-wpvB6PoFnB8Vze3IAnQTztBnB7zBnB3XTvH4I8BuB6kB", "distance": 287, "duration": 52}, {"polyline": "BGmpopxD6mupvBtB5kBoVsEkDoLkNnBuBO", "distance": 110, "duration": 17}, {"polyline": "BG2uppxD6wtpvB6bmI", "distance": 50, "duration": 6}, {"polyline": "BGwqqpxDg5tpvBndzIjNoBjDnLnVrE3I7BnBz1CzFjwBrJz3B_E7BvW_EjIUrJ4D_JkInQ8V7LgUzK8QzUkmBjmBkuCnLwWrdo9BzjBoxC3hBosCvW03B_Ts2B7GkSvM4hBjIoVnBsE8LofsEwW4DgKkN7V8BrEoQ7fsCtG", "distance": 1314, "duration": 149}, {"polyline": "BG02-oxDqj6pvBgM1fgUnuB8LsY4IgewD-U", "distance": 173, "duration": 26}, {"polyline": "BG4ugpxD2g6pvBkHmqBn4BkczU8fvC4DzFrJ7Lrd3D_JrEvW7Lnf_EkN7LgenQ8pBjD4I7LofjD4IjD4IjDsJ7GoV_T4_BzFwRnLkhBjN8kB_OwqBvlBkxDvlBshEvH8azP41BrT84BnQwqBzF4NzKsY_TwqBrY8uBzoBonCrxBoxCvMoV3IgPjIoQ_E0KnGoQjIwb3IopBjIgyBvH08BrYsiGzF8uBjDkmBTsJrEwtC3D0yB3DkX_J4mB_O4wBzZ8sC7Qw0B3NssBvR08B_OgyBrJwgB_E4SzKgjBnG8VoQ0ZsO0U8LwRkI8LkDoLUsJvC0PjSokBvgBgyBrdgtBzZgoB7Q0Z3I4NjIwMv3CooEz8Bk9C_iB41BnaopBzKoQ_2Bs0CnGgKv5B44Cr2LogS72CgnE35EwtHjrBoiCjN0U3S4c3SsdrO8VjNgUrJsOjN0UzPsYzPkXzP4X_OkX_OkX7L4SjwB4pCnzBgwCrnB08BnVsiB3IgPrY4XzP8LjSgUjX4X3I4I_O4S3SkXzPoBjIT_E7BrOzK_OrJjIjDjNjD3NTvHnBvRnG7GoB3I7G_J_JrJ3N7L7V_O7kB_Jnf_J7f_d3iD_6En1P7GnVvvBv4EriBzzDngDv4J3hB7vDjwBj5EjXzmCr2B_kFvb3uC31B__EjmBrtDrd72C7QnzBvWjpCrY7xCjSrgCrdjsDjcv1DnQnnC_O3pCrOrlC7Q_5CTvR7B7QvHrsBjInnCjD_2BA7a0FjkCkDjXoG3S0ZjSsE3D8BrEkX3N0U7L0P_JgekD0KsE0K8LwMgUwHg3BkDsdvCkI7GwCnL7GrEUrJnGjI_E_JnG_OwmD", "distance": 10954, "duration": 763}, {"polyline": "BGyj4lxDq4orvB-Ge4IgFsJ0F4IgFsOkIoG4DkI4DgK7BsEjIsEU4DoG8BU4DnBkDzFoBvHnBvHvC_EjIzoBzKzhC_E3cvH3rBnG3c4D7GoBjNT7GTnGzFzKnGvC3DUjDkD_EsJ_OsEjS4N_JoGzPgKzU8LjX4N3DnBjSsJrETnG_EzF_EjDUvHsJjIwMjDkDrT4DvH8B3DoB7QkDnV4DjN8BvWU8B31BoB7L4DvR0F3NgF7GgF_E0FvC0FToG8BgFsE0F8GsEkI8GkSwC4IgFgZsEsdkI0tBsE8Q8GgyBkNg1C8QkiD4IkwBoaooEkS82CsTs0CwbwwDoQw-B8f4xD0Z01C8VonC8Q8zBsd01C4kCopG0oBw6D4IsY41BkjF0U89B0K0jBoQ8zBgZ0wC0P0yBo2Cg4I41BgvF0oBwkEgPwvBkNkrBwMopBwb44C8LsnBk6Bw7FsY4uCsTk_B8Qo4B8V0mCoLgoBkIkmB0F8kB8B4SU0U7BsT_EwWnL4cjI0enGkmB7BkcAgZoBkX0FgoBgFoasJsdgF4NoLwWoGgKwRoVwM8L0KwHkIkDoL8B8LUwM7BgUjIkNzK8QjDkNTgK8BkIwC8L8G0KkIsJsJ4N8Q0K8QkS8f0e03BwW0oBwb4wBo4BgkDk7Do9GsO0ZwbsxB0U8kBwRof0tBwtCwlBs7B8agoBouB4_B4SsYgoBsxB8V0Z4wBk1Bs0Cg1Ck4Cg6C84Bw5B0oBopBs3Do5DkzCs0Co4Bk6B8V8VgU0UgjBokB0hCgmC4c4coiC8iCo4BsxBkI0FsjD8nC8uB4cghC4hB4wB0UgyB4SgZkIonC8QgrC0KsYoBsdAoiCvCgjBjDkX3DgZrEs7BzPsiBzK0jB3Nw-BnasxB7awyCnuBs2BvbwMzFwWnLsiBvR8iC3X8uBjN0evHkczFwRvCsd3D8avCoQA0oB8BsOUwgBsE4c4Do4B4IwHoBkcwH0tBsO4ckIwlB0KsToGsT0Fo4B4S0uDkhBgoB8L4hB8Lo9B0UgekIkN4D4hBoLwRgFkuC4X0U0F4hBsJwqBgPkmB8L0UoGgkDsdgzD0jB8kBkIsiBgF4SoBwb7BsiBvC8zB3Is7BzKgP3DsYzFsYrE82CjSkITgtBjIoQ3D4mB7G0ZrEgerJwMjD0UjIsT3I8QjIgUnL0PrJ8fjX8a7VoQrOwlBjhB0jB_d8QrOwW_T4X7VwR7QkpCvjC4X7V08B3_BgP3IkIzFkXjSkIvHoarYssBjwBwqBvvB4SzUwMrO0KzK0KjIkN7G8G7BgKnBwHUoG8BwMgFgFkD0KsJoLwMkNkSwR4c8LgZkI8QsEoGgFgF0FsTgF4N0K8V0FsdsEoVwCkNgFoV8G4hBgFoakDoQ8GokB8G4mB8L08BoL84B0P0wC0Ks2Bofk-EsTgkD4D4S8LslC4DoagK0hC7Gw5B3D8QrE8L_EsJzFkI7GoG_EkDjIkDvMwCnVoBnBvH3D3I3D3D3DnBjDAjDoB7B8BzKTzUjDnGU3I4DjIoBzK4D3N4I7GoGzU8a7LoGvCU7GT7B3D3D3DrET3D8BjD0FnB4IAoG7BkI_JwgB7aouB7uBsqCzUwgBvtC47Dze4wBv0B4zC3SgerJkNjNwMrE7BrEA3DsEjDwHnB8GA8GoBwH8BsEwCkD8BgPwCwMUgFoBwHwMouB8G8awHgZ4I8foBoQT4I8BwCgF0FoG8LoLgoB8Pu2B", "distance": 18833, "duration": 962}], "unmapped_segments": [], "total_distance_meters": 72724, "total_duration_seconds": 7344}, {"id": "22", "color": "#8DB792", "location": "Production LOO", "depot": {"lat": 59.43878, "lng": 24.9438, "name": "Depot", "address": "Depot Location", "is_offset": false}, "customers": [{"lat": 59.43314, "lng": 24.77918, "name": "3604817", "address": "J\u00fcri Vilmsi 47, Kesklinn, Tallinn, 10115 Harju Maakond, Eesti", "position": 1, "original_index": 23, "is_offset": false}, {"lat": 59.43345, "lng": 24.77869, "name": "3836963", "address": "J\u00fcri Vilmsi 45, Kesklinn, Tallinn, 10115 Harju Maakond, Eesti", "position": 2, "original_index": 24, "is_offset": false}, {"lat": 59.43419, "lng": 24.77636, "name": "94001087", "address": "Rudolf Tobiase 8, Kesklinn, Tallinn, 10152 Harju Maakond, Eesti", "position": 3, "original_index": 25, "is_offset": false}, {"lat": 59.43446, "lng": 24.77318, "name": "4038744", "address": "Kollane 2, Kesklinn, Tallinn, 10147 Harju Maakond, Eesti", "position": 4, "original_index": 26, "is_offset": false}, {"lat": 59.43438, "lng": 24.77344, "name": "94007375", "address": "Kollane 4, Kesklinn, Tallinn, 10147 Harju Maakond, Eesti", "position": 5, "original_index": 27, "is_offset": false}, {"lat": 59.434979999999996, "lng": 24.77344, "name": "94007373", "address": "Kollane 4, Kesklinn, Tallinn, 10147 Harju Maakond, Eesti", "position": 6, "original_index": 28, "is_offset": true}, {"lat": 59.43438, "lng": 24.772740000000002, "name": "94018007", "address": "Kollane 4, Kesklinn, Tallinn, 10147 Harju Maakond, Eesti", "position": 7, "original_index": 29, "is_offset": true}, {"lat": 59.43415, "lng": 24.77402, "name": "94150464", "address": "Kollane 10, Kesklinn, Tallinn, 10147 Harju Maakond, Eesti", "position": 8, "original_index": 30, "is_offset": false}, {"lat": 59.43404, "lng": 24.77445, "name": "94015977", "address": "Kollane 12, Kesklinn, Tallinn, 10147 Harju Maakond, Eesti", "position": 9, "original_index": 31, "is_offset": false}, {"lat": 59.43392, "lng": 24.77735, "name": "3603935", "address": "Jaan Poska 4, Kesklinn, Tallinn, 10121 Harju Maakond, Eesti", "position": 10, "original_index": 32, "is_offset": false}, {"lat": 59.43489, "lng": 24.78059, "name": "94152116", "address": "Jaan Poska 10, Kesklinn, Tallinn, 10121 Harju Maakond, Eesti", "position": 11, "original_index": 33, "is_offset": false}, {"lat": 59.43576, "lng": 24.7813, "name": "94157053", "address": "Jaan Poska 19a, Kesklinn, Tallinn, 10126 Harju Maakond, Eesti", "position": 12, "original_index": 34, "is_offset": false}, {"lat": 59.43525, "lng": 24.78179, "name": "94156173", "address": "Jaan Poska 12, Kesklinn, Tallinn, 10126 Harju Maakond, Eesti", "position": 13, "original_index": 35, "is_offset": false}, {"lat": 59.43527, "lng": 24.78248, "name": "3939233", "address": "Jaan Poska 14a, Kesklinn, Tallinn, 10126 Harju Maakond, Eesti", "position": 14, "original_index": 36, "is_offset": false}, {"lat": 59.43662, "lng": 24.78939, "name": "3642006", "address": "Lydia Koidula 21c, Kesklinn, Tallinn, 10127 Harju Maakond, Eesti", "position": 15, "original_index": 37, "is_offset": false}, {"lat": 59.43842, "lng": 24.78467, "name": "4007748", "address": "August Weizenbergi 20a, Kesklinn, Tallinn, 10150 Harju Maakond, Eesti", "position": 16, "original_index": 38, "is_offset": false}, {"lat": 59.43861, "lng": 24.78008, "name": "94004020", "address": "August Weizenbergi 4, Kesklinn, Tallinn, 10150 Harju Maakond, Eesti", "position": 17, "original_index": 39, "is_offset": false}, {"lat": 59.4379, "lng": 24.78048, "name": "3906715", "address": "Lydia Koidula 14c, Kesklinn, Tallinn, 10125 Harju Maakond, Eesti", "position": 18, "original_index": 40, "is_offset": false}, {"lat": 59.43773, "lng": 24.78357, "name": "94153961", "address": "Lydia Koidula 15, Kesklinn, Tallinn, 10125 Harju Maakond, Eesti", "position": 19, "original_index": 41, "is_offset": false}, {"lat": 59.44044, "lng": 24.77633, "name": "94010767", "address": "Petrooleumi 4, Kesklinn, Tallinn, 10120 Harju Maakond, Eesti", "position": 20, "original_index": 42, "is_offset": false}, {"lat": 59.44023, "lng": 24.7722, "name": "94005117", "address": "Tuukri 11, Kesklinn, Tallinn, 10120 Harju Maakond, Eesti", "position": 21, "original_index": 43, "is_offset": false}, {"lat": 59.43931, "lng": 24.76853, "name": "94156816", "address": "Tuukri 42, Kesklinn, Tallinn, 10120 Harju Maakond, Eesti", "position": 22, "original_index": 44, "is_offset": false}, {"lat": 59.43865, "lng": 24.76972, "name": "3588259", "address": "F. R. Kreutzwaldi, Narva maantee 23e, Kesklinn, Tallinn, 10120 Harju Maakond, Eesti", "position": 23, "original_index": 45, "is_offset": false}, {"lat": 59.4388, "lng": 24.7688, "name": "3701823", "address": "Karu 39, Kesklinn, Tallinn, 10120 Harju Maakond, Eesti", "position": 24, "original_index": 46, "is_offset": false}, {"lat": 59.43658, "lng": 24.76294, "name": "94010240", "address": "Villem Reimani 3, Kesklinn, Tallinn, 10124 Harju Maakond, Eesti", "position": 25, "original_index": 47, "is_offset": false}, {"lat": 59.43532, "lng": 24.76187, "name": "94011716", "address": "Gonsiori 13, Kesklinn, Tallinn, 10124 Harju Maakond, Eesti", "position": 26, "original_index": 48, "is_offset": false}, {"lat": 59.43825, "lng": 24.75922, "name": "4478005", "address": "Narva maantee 7a, Kesklinn, Tallinn, 10117 Harju Maakond, Eesti", "position": 27, "original_index": 49, "is_offset": false}, {"lat": 59.43839, "lng": 24.75786, "name": "3741815", "address": "Rotermanni 2, Kesklinn, Tallinn, 10111 Harju Maakond, Eesti", "position": 28, "original_index": 50, "is_offset": false}, {"lat": 59.44085, "lng": 24.76446, "name": "94151393", "address": "Lootsi 3a, Kesklinn, Tallinn, 10151 Harju Maakond, Eesti", "position": 29, "original_index": 51, "is_offset": false}, {"lat": 59.43728, "lng": 24.76395, "name": "4517514", "address": "Narva Mnt 12, Kesklinn, Tallinn, 10124 Harju Maakond, Eesti", "position": 30, "original_index": 52, "is_offset": false}, {"lat": 59.43788, "lng": 24.76395, "name": "94001557", "address": "Narva Mnt 12, Kesklinn, Tallinn, 10124 Harju Maakond, Eesti", "position": 31, "original_index": 53, "is_offset": true}, {"lat": 59.43728, "lng": 24.763250000000003, "name": "94004255", "address": "Narva Mnt 12, Kesklinn, Tallinn, 10124 Harju Maakond, Eesti", "position": 32, "original_index": 54, "is_offset": true}, {"lat": 59.43648, "lng": 24.76395, "name": "94007873", "address": "Narva Mnt 12, Kesklinn, Tallinn, 10124 Harju Maakond, Eesti", "position": 33, "original_index": 55, "is_offset": true}, {"lat": 59.43728, "lng": 24.764850000000003, "name": "94006503", "address": "Narva Mnt 12, Kesklinn, Tallinn, 10124 Harju Maakond, Eesti", "position": 34, "original_index": 56, "is_offset": true}, {"lat": 59.43828, "lng": 24.76395, "name": "94017032", "address": "Narva Mnt 12, Kesklinn, Tallinn, 10124 Harju Maakond, Eesti", "position": 35, "original_index": 57, "is_offset": true}, {"lat": 59.43674, "lng": 24.76423, "name": "94018481", "address": "Pronksi 4, Kesklinn, Tallinn, 10124 Harju Maakond, Eesti", "position": 36, "original_index": 58, "is_offset": false}, {"lat": 59.43345, "lng": 24.76417, "name": "94155110", "address": "Pronksi 19, Kesklinn, Tallinn, 10124 Harju Maakond, Eesti", "position": 37, "original_index": 59, "is_offset": false}, {"lat": 59.43352, "lng": 24.76596, "name": "94150458", "address": "Juhan Kunderi 8, Kesklinn, Tallinn, 10128 Harju Maakond, Eesti", "position": 38, "original_index": 60, "is_offset": false}, {"lat": 59.43232, "lng": 24.76925, "name": "94155889", "address": "Carl Robert Jakobsoni 7, Kesklinn, Tallinn, 10128 Harju Maakond, Eesti", "position": 39, "original_index": 61, "is_offset": false}, {"lat": 59.43303, "lng": 24.77214, "name": "94156974", "address": "Jakobsoni, Juhan Kunderi 15, Kesklinn, Tallinn, 10121 Harju Maakond, Eesti", "position": 40, "original_index": 62, "is_offset": false}, {"lat": 59.43122, "lng": 24.77581, "name": "3340737", "address": "Juhan Kunderi 33, Kesklinn, Tallinn, 10121 Harju Maakond, Eesti", "position": 41, "original_index": 63, "is_offset": false}, {"lat": 59.4311, "lng": 24.77614, "name": "94156302", "address": "Juhan Kunderi 35, Kesklinn, Tallinn, 10121 Harju Maakond, Eesti", "position": 42, "original_index": 64, "is_offset": false}, {"lat": 59.4298, "lng": 24.77455, "name": "94155454", "address": "Karl August Hermanni 1, Kesklinn, Tallinn, 10121 Harju Maakond, Eesti", "position": 43, "original_index": 65, "is_offset": false}, {"lat": 59.43002, "lng": 24.77666, "name": "4558713", "address": "Karl August Hermanni 8a, Kesklinn, Tallinn, 10121 Harju Maakond, Eesti", "position": 44, "original_index": 66, "is_offset": false}, {"lat": 59.43093, "lng": 24.77691, "name": "94153552", "address": "Juhan Kunderi 37, Kesklinn, Tallinn, 10121 Harju Maakond, Eesti", "position": 45, "original_index": 67, "is_offset": false}, {"lat": 59.42738, "lng": 24.77133, "name": "3424427", "address": "Jakobi 28, Kesklinn, Tallinn, 10144 Harju Maakond, Eesti", "position": 46, "original_index": 68, "is_offset": false}, {"lat": 59.41449, "lng": 24.75622, "name": "94014306", "address": "Veerenni 52, Kesklinn, Tallinn, 11313 Harju Maakond, Eesti", "position": 47, "original_index": 69, "is_offset": false}, {"lat": 59.4149, "lng": 24.75858, "name": "94156110", "address": "Veerenni 65, Kesklinn, Tallinn, 11313 Harju Maakond, Eesti", "position": 48, "original_index": 70, "is_offset": false}, {"lat": 59.41976, "lng": 24.76158, "name": "4516703", "address": "Veskiposti 1, Kesklinn, Tallinn, 11313 Harju Maakond, Eesti", "position": 49, "original_index": 71, "is_offset": false}, {"lat": 59.42168, "lng": 24.74951, "name": "4504730", "address": "Pille 7, Kesklinn, Tallinn, 10135 Harju Maakond, Eesti", "position": 50, "original_index": 72, "is_offset": false}, {"lat": 59.42861, "lng": 24.75647, "name": "94010387", "address": "Ravi 27, Kesklinn, Tallinn, 10138 Harju Maakond, Eesti", "position": 51, "original_index": 73, "is_offset": false}, {"lat": 59.43311, "lng": 24.75192, "name": "3993704", "address": "Estonia puiestee 9, Kesklinn, Tallinn, 10143 Harju Maakond, Eesti", "position": 52, "original_index": 74, "is_offset": false}, {"lat": 59.43447, "lng": 24.75338, "name": "3639184", "address": "Tammsaare, Estonia puiestee, Kesklinn, Tallinn, 10143 Harju Maakond, Eesti", "position": 53, "original_index": 75, "is_offset": false}, {"lat": 59.43341, "lng": 24.76012, "name": "94156671", "address": "Maakri 19, Kesklinn, Tallinn, 10145 Harju Maakond, Eesti", "position": 54, "original_index": 76, "is_offset": false}, {"lat": 59.43401, "lng": 24.76012, "name": "3416853", "address": "Maakri 19, Kesklinn, Tallinn, 10145 Harju Maakond, Eesti", "position": 55, "original_index": 77, "is_offset": true}, {"lat": 59.43341, "lng": 24.759420000000002, "name": "94156642", "address": "Maakri 19, Kesklinn, Tallinn, 10145 Harju Maakond, Eesti", "position": 56, "original_index": 78, "is_offset": true}, {"lat": 59.4333, "lng": 24.76001, "name": "3984494", "address": "Maakri 19/1, Kesklinn, Tallinn, 10145 Harju Maakond, Eesti", "position": 57, "original_index": 79, "is_offset": false}, {"lat": 59.4339, "lng": 24.76001, "name": "94005651", "address": "Maakri 19/1, Kesklinn, Tallinn, 10145 Harju Maakond, Eesti", "position": 58, "original_index": 80, "is_offset": true}, {"lat": 59.4331, "lng": 24.75949, "name": "3850103", "address": "Maakri 19/2, Kesklinn, Tallinn, 10145 Harju Maakond, Eesti", "position": 59, "original_index": 81, "is_offset": false}, {"lat": 59.4337, "lng": 24.75949, "name": "3375810", "address": "Maakri 19/2, Kesklinn, Tallinn, 10145 Harju Maakond, Eesti", "position": 60, "original_index": 82, "is_offset": true}, {"lat": 59.43268, "lng": 24.765, "name": "94002997", "address": "Tartu maantee 33, Kesklinn, Tallinn, 10128 Harju Maakond, Eesti", "position": 61, "original_index": 83, "is_offset": false}, {"lat": 59.43261, "lng": 24.76587, "name": "94156163", "address": "Juhan Kunderi 8a, Kesklinn, Tallinn, 10128 Harju Maakond, Eesti", "position": 62, "original_index": 84, "is_offset": false}, {"lat": 59.43529, "lng": 24.7649, "name": "3782314", "address": "Pronksi 11, Kesklinn, Tallinn, 10124 Harju Maakond, Eesti", "position": 63, "original_index": 85, "is_offset": false}, {"lat": 59.43482, "lng": 24.76514, "name": "94004128", "address": "Gonsiori 17, Kesklinn, Tallinn, 10124 Harju Maakond, Eesti", "position": 64, "original_index": 86, "is_offset": false}, {"lat": 59.43599, "lng": 24.76547, "name": "94004499", "address": "Pronksi 7, Kesklinn, Tallinn, 10124 Harju Maakond, Eesti", "position": 65, "original_index": 87, "is_offset": false}, {"lat": 59.4363, "lng": 24.76984, "name": "94154168", "address": "Friedrich Reinhold Kreutzwaldi 9, Kesklinn, Tallinn, 10124 Harju Maakond, Eesti", "position": 66, "original_index": 88, "is_offset": false}, {"lat": 59.4376, "lng": 24.77184, "name": "94155106", "address": "Raua 53, Kesklinn, Tallinn, 10120 Harju Maakond, Eesti", "position": 67, "original_index": 89, "is_offset": false}, {"lat": 59.43834, "lng": 24.77639, "name": "4507772", "address": "Johann K\u00f6leri 1, Kesklinn, Tallinn, 10150 Harju Maakond, Eesti", "position": 68, "original_index": 90, "is_offset": false}], "has_duplicate_coordinates": true, "segments": [{"start": {"lat": 59.43878, "lng": 24.9438, "name": "Depot", "address": "Depot Location", "is_offset": false}, "end": {"lat": 59.43314, "lng": 24.77918, "name": "3604817", "address": "J\u00fcri Vilmsi 47, Kesklinn, Tallinn, 10115 Harju Maakond, Eesti", "position": 1, "original_index": 23, "is_offset": false}, "segment_id": 0}, {"start": {"lat": 59.43314, "lng": 24.77918, "name": "3604817", "address": "J\u00fcri Vilmsi 47, Kesklinn, Tallinn, 10115 Harju Maakond, Eesti", "position": 1, "original_index": 23, "is_offset": false}, "end": {"lat": 59.43345, "lng": 24.77869, "name": "3836963", "address": "J\u00fcri Vilmsi 45, Kesklinn, Tallinn, 10115 Harju Maakond, Eesti", "position": 2, "original_index": 24, "is_offset": false}, "segment_id": 1}, {"start": {"lat": 59.43345, "lng": 24.77869, "name": "3836963", "address": "J\u00fcri Vilmsi 45, Kesklinn, Tallinn, 10115 Harju Maakond, Eesti", "position": 2, "original_index": 24, "is_offset": false}, "end": {"lat": 59.43419, "lng": 24.77636, "name": "94001087", "address": "Rudolf Tobiase 8, Kesklinn, Tallinn, 10152 Harju Maakond, Eesti", "position": 3, "original_index": 25, "is_offset": false}, "segment_id": 2}, {"start": {"lat": 59.43419, "lng": 24.77636, "name": "94001087", "address": "Rudolf Tobiase 8, Kesklinn, Tallinn, 10152 Harju Maakond, Eesti", "position": 3, "original_index": 25, "is_offset": false}, "end": {"lat": 59.43446, "lng": 24.77318, "name": "4038744", "address": "Kollane 2, Kesklinn, Tallinn, 10147 Harju Maakond, Eesti", "position": 4, "original_index": 26, "is_offset": false}, "segment_id": 3}, {"start": {"lat": 59.43446, "lng": 24.77318, "name": "4038744", "address": "Kollane 2, Kesklinn, Tallinn, 10147 Harju Maakond, Eesti", "position": 4, "original_index": 26, "is_offset": false}, "end": {"lat": 59.43438, "lng": 24.77344, "name": "94007375", "address": "Kollane 4, Kesklinn, Tallinn, 10147 Harju Maakond, Eesti", "position": 5, "original_index": 27, "is_offset": false}, "segment_id": 4}, {"start": {"lat": 59.43438, "lng": 24.77344, "name": "94007375", "address": "Kollane 4, Kesklinn, Tallinn, 10147 Harju Maakond, Eesti", "position": 5, "original_index": 27, "is_offset": false}, "end": {"lat": 59.434979999999996, "lng": 24.77344, "name": "94007373", "address": "Kollane 4, Kesklinn, Tallinn, 10147 Harju Maakond, Eesti", "position": 6, "original_index": 28, "is_offset": true}, "segment_id": 5}, {"start": {"lat": 59.434979999999996, "lng": 24.77344, "name": "94007373", "address": "Kollane 4, Kesklinn, Tallinn, 10147 Harju Maakond, Eesti", "position": 6, "original_index": 28, "is_offset": true}, "end": {"lat": 59.43438, "lng": 24.772740000000002, "name": "94018007", "address": "Kollane 4, Kesklinn, Tallinn, 10147 Harju Maakond, Eesti", "position": 7, "original_index": 29, "is_offset": true}, "segment_id": 6}, {"start": {"lat": 59.43438, "lng": 24.772740000000002, "name": "94018007", "address": "Kollane 4, Kesklinn, Tallinn, 10147 Harju Maakond, Eesti", "position": 7, "original_index": 29, "is_offset": true}, "end": {"lat": 59.43415, "lng": 24.77402, "name": "94150464", "address": "Kollane 10, Kesklinn, Tallinn, 10147 Harju Maakond, Eesti", "position": 8, "original_index": 30, "is_offset": false}, "segment_id": 7}, {"start": {"lat": 59.43415, "lng": 24.77402, "name": "94150464", "address": "Kollane 10, Kesklinn, Tallinn, 10147 Harju Maakond, Eesti", "position": 8, "original_index": 30, "is_offset": false}, "end": {"lat": 59.43404, "lng": 24.77445, "name": "94015977", "address": "Kollane 12, Kesklinn, Tallinn, 10147 Harju Maakond, Eesti", "position": 9, "original_index": 31, "is_offset": false}, "segment_id": 8}, {"start": {"lat": 59.43404, "lng": 24.77445, "name": "94015977", "address": "Kollane 12, Kesklinn, Tallinn, 10147 Harju Maakond, Eesti", "position": 9, "original_index": 31, "is_offset": false}, "end": {"lat": 59.43392, "lng": 24.77735, "name": "3603935", "address": "Jaan Poska 4, Kesklinn, Tallinn, 10121 Harju Maakond, Eesti", "position": 10, "original_index": 32, "is_offset": false}, "segment_id": 9}, {"start": {"lat": 59.43392, "lng": 24.77735, "name": "3603935", "address": "Jaan Poska 4, Kesklinn, Tallinn, 10121 Harju Maakond, Eesti", "position": 10, "original_index": 32, "is_offset": false}, "end": {"lat": 59.43489, "lng": 24.78059, "name": "94152116", "address": "Jaan Poska 10, Kesklinn, Tallinn, 10121 Harju Maakond, Eesti", "position": 11, "original_index": 33, "is_offset": false}, "segment_id": 10}, {"start": {"lat": 59.43489, "lng": 24.78059, "name": "94152116", "address": "Jaan Poska 10, Kesklinn, Tallinn, 10121 Harju Maakond, Eesti", "position": 11, "original_index": 33, "is_offset": false}, "end": {"lat": 59.43576, "lng": 24.7813, "name": "94157053", "address": "Jaan Poska 19a, Kesklinn, Tallinn, 10126 Harju Maakond, Eesti", "position": 12, "original_index": 34, "is_offset": false}, "segment_id": 11}, {"start": {"lat": 59.43576, "lng": 24.7813, "name": "94157053", "address": "Jaan Poska 19a, Kesklinn, Tallinn, 10126 Harju Maakond, Eesti", "position": 12, "original_index": 34, "is_offset": false}, "end": {"lat": 59.43525, "lng": 24.78179, "name": "94156173", "address": "Jaan Poska 12, Kesklinn, Tallinn, 10126 Harju Maakond, Eesti", "position": 13, "original_index": 35, "is_offset": false}, "segment_id": 12}, {"start": {"lat": 59.43525, "lng": 24.78179, "name": "94156173", "address": "Jaan Poska 12, Kesklinn, Tallinn, 10126 Harju Maakond, Eesti", "position": 13, "original_index": 35, "is_offset": false}, "end": {"lat": 59.43527, "lng": 24.78248, "name": "3939233", "address": "Jaan Poska 14a, Kesklinn, Tallinn, 10126 Harju Maakond, Eesti", "position": 14, "original_index": 36, "is_offset": false}, "segment_id": 13}, {"start": {"lat": 59.43527, "lng": 24.78248, "name": "3939233", "address": "Jaan Poska 14a, Kesklinn, Tallinn, 10126 Harju Maakond, Eesti", "position": 14, "original_index": 36, "is_offset": false}, "end": {"lat": 59.43662, "lng": 24.78939, "name": "3642006", "address": "Lydia Koidula 21c, Kesklinn, Tallinn, 10127 Harju Maakond, Eesti", "position": 15, "original_index": 37, "is_offset": false}, "segment_id": 14}, {"start": {"lat": 59.43662, "lng": 24.78939, "name": "3642006", "address": "Lydia Koidula 21c, Kesklinn, Tallinn, 10127 Harju Maakond, Eesti", "position": 15, "original_index": 37, "is_offset": false}, "end": {"lat": 59.43842, "lng": 24.78467, "name": "4007748", "address": "August Weizenbergi 20a, Kesklinn, Tallinn, 10150 Harju Maakond, Eesti", "position": 16, "original_index": 38, "is_offset": false}, "segment_id": 15}, {"start": {"lat": 59.43842, "lng": 24.78467, "name": "4007748", "address": "August Weizenbergi 20a, Kesklinn, Tallinn, 10150 Harju Maakond, Eesti", "position": 16, "original_index": 38, "is_offset": false}, "end": {"lat": 59.43861, "lng": 24.78008, "name": "94004020", "address": "August Weizenbergi 4, Kesklinn, Tallinn, 10150 Harju Maakond, Eesti", "position": 17, "original_index": 39, "is_offset": false}, "segment_id": 16}, {"start": {"lat": 59.43861, "lng": 24.78008, "name": "94004020", "address": "August Weizenbergi 4, Kesklinn, Tallinn, 10150 Harju Maakond, Eesti", "position": 17, "original_index": 39, "is_offset": false}, "end": {"lat": 59.4379, "lng": 24.78048, "name": "3906715", "address": "Lydia Koidula 14c, Kesklinn, Tallinn, 10125 Harju Maakond, Eesti", "position": 18, "original_index": 40, "is_offset": false}, "segment_id": 17}, {"start": {"lat": 59.4379, "lng": 24.78048, "name": "3906715", "address": "Lydia Koidula 14c, Kesklinn, Tallinn, 10125 Harju Maakond, Eesti", "position": 18, "original_index": 40, "is_offset": false}, "end": {"lat": 59.43773, "lng": 24.78357, "name": "94153961", "address": "Lydia Koidula 15, Kesklinn, Tallinn, 10125 Harju Maakond, Eesti", "position": 19, "original_index": 41, "is_offset": false}, "segment_id": 18}, {"start": {"lat": 59.43773, "lng": 24.78357, "name": "94153961", "address": "Lydia Koidula 15, Kesklinn, Tallinn, 10125 Harju Maakond, Eesti", "position": 19, "original_index": 41, "is_offset": false}, "end": {"lat": 59.44044, "lng": 24.77633, "name": "94010767", "address": "Petrooleumi 4, Kesklinn, Tallinn, 10120 Harju Maakond, Eesti", "position": 20, "original_index": 42, "is_offset": false}, "segment_id": 19}, {"start": {"lat": 59.44044, "lng": 24.77633, "name": "94010767", "address": "Petrooleumi 4, Kesklinn, Tallinn, 10120 Harju Maakond, Eesti", "position": 20, "original_index": 42, "is_offset": false}, "end": {"lat": 59.44023, "lng": 24.7722, "name": "94005117", "address": "Tuukri 11, Kesklinn, Tallinn, 10120 Harju Maakond, Eesti", "position": 21, "original_index": 43, "is_offset": false}, "segment_id": 20}, {"start": {"lat": 59.44023, "lng": 24.7722, "name": "94005117", "address": "Tuukri 11, Kesklinn, Tallinn, 10120 Harju Maakond, Eesti", "position": 21, "original_index": 43, "is_offset": false}, "end": {"lat": 59.43931, "lng": 24.76853, "name": "94156816", "address": "Tuukri 42, Kesklinn, Tallinn, 10120 Harju Maakond, Eesti", "position": 22, "original_index": 44, "is_offset": false}, "segment_id": 21}, {"start": {"lat": 59.43931, "lng": 24.76853, "name": "94156816", "address": "Tuukri 42, Kesklinn, Tallinn, 10120 Harju Maakond, Eesti", "position": 22, "original_index": 44, "is_offset": false}, "end": {"lat": 59.43865, "lng": 24.76972, "name": "3588259", "address": "F. R. Kreutzwaldi, Narva maantee 23e, Kesklinn, Tallinn, 10120 Harju Maakond, Eesti", "position": 23, "original_index": 45, "is_offset": false}, "segment_id": 22}, {"start": {"lat": 59.43865, "lng": 24.76972, "name": "3588259", "address": "F. R. Kreutzwaldi, Narva maantee 23e, Kesklinn, Tallinn, 10120 Harju Maakond, Eesti", "position": 23, "original_index": 45, "is_offset": false}, "end": {"lat": 59.4388, "lng": 24.7688, "name": "3701823", "address": "Karu 39, Kesklinn, Tallinn, 10120 Harju Maakond, Eesti", "position": 24, "original_index": 46, "is_offset": false}, "segment_id": 23}, {"start": {"lat": 59.4388, "lng": 24.7688, "name": "3701823", "address": "Karu 39, Kesklinn, Tallinn, 10120 Harju Maakond, Eesti", "position": 24, "original_index": 46, "is_offset": false}, "end": {"lat": 59.43658, "lng": 24.76294, "name": "94010240", "address": "Villem Reimani 3, Kesklinn, Tallinn, 10124 Harju Maakond, Eesti", "position": 25, "original_index": 47, "is_offset": false}, "segment_id": 24}, {"start": {"lat": 59.43658, "lng": 24.76294, "name": "94010240", "address": "Villem Reimani 3, Kesklinn, Tallinn, 10124 Harju Maakond, Eesti", "position": 25, "original_index": 47, "is_offset": false}, "end": {"lat": 59.43532, "lng": 24.76187, "name": "94011716", "address": "Gonsiori 13, Kesklinn, Tallinn, 10124 Harju Maakond, Eesti", "position": 26, "original_index": 48, "is_offset": false}, "segment_id": 25}, {"start": {"lat": 59.43532, "lng": 24.76187, "name": "94011716", "address": "Gonsiori 13, Kesklinn, Tallinn, 10124 Harju Maakond, Eesti", "position": 26, "original_index": 48, "is_offset": false}, "end": {"lat": 59.43825, "lng": 24.75922, "name": "4478005", "address": "Narva maantee 7a, Kesklinn, Tallinn, 10117 Harju Maakond, Eesti", "position": 27, "original_index": 49, "is_offset": false}, "segment_id": 26}, {"start": {"lat": 59.43825, "lng": 24.75922, "name": "4478005", "address": "Narva maantee 7a, Kesklinn, Tallinn, 10117 Harju Maakond, Eesti", "position": 27, "original_index": 49, "is_offset": false}, "end": {"lat": 59.43839, "lng": 24.75786, "name": "3741815", "address": "Rotermanni 2, Kesklinn, Tallinn, 10111 Harju Maakond, Eesti", "position": 28, "original_index": 50, "is_offset": false}, "segment_id": 27}, {"start": {"lat": 59.43839, "lng": 24.75786, "name": "3741815", "address": "Rotermanni 2, Kesklinn, Tallinn, 10111 Harju Maakond, Eesti", "position": 28, "original_index": 50, "is_offset": false}, "end": {"lat": 59.44085, "lng": 24.76446, "name": "94151393", "address": "Lootsi 3a, Kesklinn, Tallinn, 10151 Harju Maakond, Eesti", "position": 29, "original_index": 51, "is_offset": false}, "segment_id": 28}, {"start": {"lat": 59.44085, "lng": 24.76446, "name": "94151393", "address": "Lootsi 3a, Kesklinn, Tallinn, 10151 Harju Maakond, Eesti", "position": 29, "original_index": 51, "is_offset": false}, "end": {"lat": 59.43728, "lng": 24.76395, "name": "4517514", "address": "Narva Mnt 12, Kesklinn, Tallinn, 10124 Harju Maakond, Eesti", "position": 30, "original_index": 52, "is_offset": false}, "segment_id": 29}, {"start": {"lat": 59.43728, "lng": 24.76395, "name": "4517514", "address": "Narva Mnt 12, Kesklinn, Tallinn, 10124 Harju Maakond, Eesti", "position": 30, "original_index": 52, "is_offset": false}, "end": {"lat": 59.43788, "lng": 24.76395, "name": "94001557", "address": "Narva Mnt 12, Kesklinn, Tallinn, 10124 Harju Maakond, Eesti", "position": 31, "original_index": 53, "is_offset": true}, "segment_id": 30}, {"start": {"lat": 59.43788, "lng": 24.76395, "name": "94001557", "address": "Narva Mnt 12, Kesklinn, Tallinn, 10124 Harju Maakond, Eesti", "position": 31, "original_index": 53, "is_offset": true}, "end": {"lat": 59.43728, "lng": 24.763250000000003, "name": "94004255", "address": "Narva Mnt 12, Kesklinn, Tallinn, 10124 Harju Maakond, Eesti", "position": 32, "original_index": 54, "is_offset": true}, "segment_id": 31}, {"start": {"lat": 59.43728, "lng": 24.763250000000003, "name": "94004255", "address": "Narva Mnt 12, Kesklinn, Tallinn, 10124 Harju Maakond, Eesti", "position": 32, "original_index": 54, "is_offset": true}, "end": {"lat": 59.43648, "lng": 24.76395, "name": "94007873", "address": "Narva Mnt 12, Kesklinn, Tallinn, 10124 Harju Maakond, Eesti", "position": 33, "original_index": 55, "is_offset": true}, "segment_id": 32}, {"start": {"lat": 59.43648, "lng": 24.76395, "name": "94007873", "address": "Narva Mnt 12, Kesklinn, Tallinn, 10124 Harju Maakond, Eesti", "position": 33, "original_index": 55, "is_offset": true}, "end": {"lat": 59.43728, "lng": 24.764850000000003, "name": "94006503", "address": "Narva Mnt 12, Kesklinn, Tallinn, 10124 Harju Maakond, Eesti", "position": 34, "original_index": 56, "is_offset": true}, "segment_id": 33}, {"start": {"lat": 59.43728, "lng": 24.764850000000003, "name": "94006503", "address": "Narva Mnt 12, Kesklinn, Tallinn, 10124 Harju Maakond, Eesti", "position": 34, "original_index": 56, "is_offset": true}, "end": {"lat": 59.43828, "lng": 24.76395, "name": "94017032", "address": "Narva Mnt 12, Kesklinn, Tallinn, 10124 Harju Maakond, Eesti", "position": 35, "original_index": 57, "is_offset": true}, "segment_id": 34}, {"start": {"lat": 59.43828, "lng": 24.76395, "name": "94017032", "address": "Narva Mnt 12, Kesklinn, Tallinn, 10124 Harju Maakond, Eesti", "position": 35, "original_index": 57, "is_offset": true}, "end": {"lat": 59.43674, "lng": 24.76423, "name": "94018481", "address": "Pronksi 4, Kesklinn, Tallinn, 10124 Harju Maakond, Eesti", "position": 36, "original_index": 58, "is_offset": false}, "segment_id": 35}, {"start": {"lat": 59.43674, "lng": 24.76423, "name": "94018481", "address": "Pronksi 4, Kesklinn, Tallinn, 10124 Harju Maakond, Eesti", "position": 36, "original_index": 58, "is_offset": false}, "end": {"lat": 59.43345, "lng": 24.76417, "name": "94155110", "address": "Pronksi 19, Kesklinn, Tallinn, 10124 Harju Maakond, Eesti", "position": 37, "original_index": 59, "is_offset": false}, "segment_id": 36}, {"start": {"lat": 59.43345, "lng": 24.76417, "name": "94155110", "address": "Pronksi 19, Kesklinn, Tallinn, 10124 Harju Maakond, Eesti", "position": 37, "original_index": 59, "is_offset": false}, "end": {"lat": 59.43352, "lng": 24.76596, "name": "94150458", "address": "Juhan Kunderi 8, Kesklinn, Tallinn, 10128 Harju Maakond, Eesti", "position": 38, "original_index": 60, "is_offset": false}, "segment_id": 37}, {"start": {"lat": 59.43352, "lng": 24.76596, "name": "94150458", "address": "Juhan Kunderi 8, Kesklinn, Tallinn, 10128 Harju Maakond, Eesti", "position": 38, "original_index": 60, "is_offset": false}, "end": {"lat": 59.43232, "lng": 24.76925, "name": "94155889", "address": "Carl Robert Jakobsoni 7, Kesklinn, Tallinn, 10128 Harju Maakond, Eesti", "position": 39, "original_index": 61, "is_offset": false}, "segment_id": 38}, {"start": {"lat": 59.43232, "lng": 24.76925, "name": "94155889", "address": "Carl Robert Jakobsoni 7, Kesklinn, Tallinn, 10128 Harju Maakond, Eesti", "position": 39, "original_index": 61, "is_offset": false}, "end": {"lat": 59.43303, "lng": 24.77214, "name": "94156974", "address": "Jakobsoni, Juhan Kunderi 15, Kesklinn, Tallinn, 10121 Harju Maakond, Eesti", "position": 40, "original_index": 62, "is_offset": false}, "segment_id": 39}, {"start": {"lat": 59.43303, "lng": 24.77214, "name": "94156974", "address": "Jakobsoni, Juhan Kunderi 15, Kesklinn, Tallinn, 10121 Harju Maakond, Eesti", "position": 40, "original_index": 62, "is_offset": false}, "end": {"lat": 59.43122, "lng": 24.77581, "name": "3340737", "address": "Juhan Kunderi 33, Kesklinn, Tallinn, 10121 Harju Maakond, Eesti", "position": 41, "original_index": 63, "is_offset": false}, "segment_id": 40}, {"start": {"lat": 59.43122, "lng": 24.77581, "name": "3340737", "address": "Juhan Kunderi 33, Kesklinn, Tallinn, 10121 Harju Maakond, Eesti", "position": 41, "original_index": 63, "is_offset": false}, "end": {"lat": 59.4311, "lng": 24.77614, "name": "94156302", "address": "Juhan Kunderi 35, Kesklinn, Tallinn, 10121 Harju Maakond, Eesti", "position": 42, "original_index": 64, "is_offset": false}, "segment_id": 41}, {"start": {"lat": 59.4311, "lng": 24.77614, "name": "94156302", "address": "Juhan Kunderi 35, Kesklinn, Tallinn, 10121 Harju Maakond, Eesti", "position": 42, "original_index": 64, "is_offset": false}, "end": {"lat": 59.4298, "lng": 24.77455, "name": "94155454", "address": "Karl August Hermanni 1, Kesklinn, Tallinn, 10121 Harju Maakond, Eesti", "position": 43, "original_index": 65, "is_offset": false}, "segment_id": 42}, {"start": {"lat": 59.4298, "lng": 24.77455, "name": "94155454", "address": "Karl August Hermanni 1, Kesklinn, Tallinn, 10121 Harju Maakond, Eesti", "position": 43, "original_index": 65, "is_offset": false}, "end": {"lat": 59.43002, "lng": 24.77666, "name": "4558713", "address": "Karl August Hermanni 8a, Kesklinn, Tallinn, 10121 Harju Maakond, Eesti", "position": 44, "original_index": 66, "is_offset": false}, "segment_id": 43}, {"start": {"lat": 59.43002, "lng": 24.77666, "name": "4558713", "address": "Karl August Hermanni 8a, Kesklinn, Tallinn, 10121 Harju Maakond, Eesti", "position": 44, "original_index": 66, "is_offset": false}, "end": {"lat": 59.43093, "lng": 24.77691, "name": "94153552", "address": "Juhan Kunderi 37, Kesklinn, Tallinn, 10121 Harju Maakond, Eesti", "position": 45, "original_index": 67, "is_offset": false}, "segment_id": 44}, {"start": {"lat": 59.43093, "lng": 24.77691, "name": "94153552", "address": "Juhan Kunderi 37, Kesklinn, Tallinn, 10121 Harju Maakond, Eesti", "position": 45, "original_index": 67, "is_offset": false}, "end": {"lat": 59.42738, "lng": 24.77133, "name": "3424427", "address": "Jakobi 28, Kesklinn, Tallinn, 10144 Harju Maakond, Eesti", "position": 46, "original_index": 68, "is_offset": false}, "segment_id": 45}, {"start": {"lat": 59.42738, "lng": 24.77133, "name": "3424427", "address": "Jakobi 28, Kesklinn, Tallinn, 10144 Harju Maakond, Eesti", "position": 46, "original_index": 68, "is_offset": false}, "end": {"lat": 59.41449, "lng": 24.75622, "name": "94014306", "address": "Veerenni 52, Kesklinn, Tallinn, 11313 Harju Maakond, Eesti", "position": 47, "original_index": 69, "is_offset": false}, "segment_id": 46}, {"start": {"lat": 59.41449, "lng": 24.75622, "name": "94014306", "address": "Veerenni 52, Kesklinn, Tallinn, 11313 Harju Maakond, Eesti", "position": 47, "original_index": 69, "is_offset": false}, "end": {"lat": 59.4149, "lng": 24.75858, "name": "94156110", "address": "Veerenni 65, Kesklinn, Tallinn, 11313 Harju Maakond, Eesti", "position": 48, "original_index": 70, "is_offset": false}, "segment_id": 47}, {"start": {"lat": 59.4149, "lng": 24.75858, "name": "94156110", "address": "Veerenni 65, Kesklinn, Tallinn, 11313 Harju Maakond, Eesti", "position": 48, "original_index": 70, "is_offset": false}, "end": {"lat": 59.41976, "lng": 24.76158, "name": "4516703", "address": "Veskiposti 1, Kesklinn, Tallinn, 11313 Harju Maakond, Eesti", "position": 49, "original_index": 71, "is_offset": false}, "segment_id": 48}, {"start": {"lat": 59.41976, "lng": 24.76158, "name": "4516703", "address": "Veskiposti 1, Kesklinn, Tallinn, 11313 Harju Maakond, Eesti", "position": 49, "original_index": 71, "is_offset": false}, "end": {"lat": 59.42168, "lng": 24.74951, "name": "4504730", "address": "Pille 7, Kesklinn, Tallinn, 10135 Harju Maakond, Eesti", "position": 50, "original_index": 72, "is_offset": false}, "segment_id": 49}, {"start": {"lat": 59.42168, "lng": 24.74951, "name": "4504730", "address": "Pille 7, Kesklinn, Tallinn, 10135 Harju Maakond, Eesti", "position": 50, "original_index": 72, "is_offset": false}, "end": {"lat": 59.42861, "lng": 24.75647, "name": "94010387", "address": "Ravi 27, Kesklinn, Tallinn, 10138 Harju Maakond, Eesti", "position": 51, "original_index": 73, "is_offset": false}, "segment_id": 50}, {"start": {"lat": 59.42861, "lng": 24.75647, "name": "94010387", "address": "Ravi 27, Kesklinn, Tallinn, 10138 Harju Maakond, Eesti", "position": 51, "original_index": 73, "is_offset": false}, "end": {"lat": 59.43311, "lng": 24.75192, "name": "3993704", "address": "Estonia puiestee 9, Kesklinn, Tallinn, 10143 Harju Maakond, Eesti", "position": 52, "original_index": 74, "is_offset": false}, "segment_id": 51}, {"start": {"lat": 59.43311, "lng": 24.75192, "name": "3993704", "address": "Estonia puiestee 9, Kesklinn, Tallinn, 10143 Harju Maakond, Eesti", "position": 52, "original_index": 74, "is_offset": false}, "end": {"lat": 59.43447, "lng": 24.75338, "name": "3639184", "address": "Tammsaare, Estonia puiestee, Kesklinn, Tallinn, 10143 Harju Maakond, Eesti", "position": 53, "original_index": 75, "is_offset": false}, "segment_id": 52}, {"start": {"lat": 59.43447, "lng": 24.75338, "name": "3639184", "address": "Tammsaare, Estonia puiestee, Kesklinn, Tallinn, 10143 Harju Maakond, Eesti", "position": 53, "original_index": 75, "is_offset": false}, "end": {"lat": 59.43341, "lng": 24.76012, "name": "94156671", "address": "Maakri 19, Kesklinn, Tallinn, 10145 Harju Maakond, Eesti", "position": 54, "original_index": 76, "is_offset": false}, "segment_id": 53}, {"start": {"lat": 59.43341, "lng": 24.76012, "name": "94156671", "address": "Maakri 19, Kesklinn, Tallinn, 10145 Harju Maakond, Eesti", "position": 54, "original_index": 76, "is_offset": false}, "end": {"lat": 59.43401, "lng": 24.76012, "name": "3416853", "address": "Maakri 19, Kesklinn, Tallinn, 10145 Harju Maakond, Eesti", "position": 55, "original_index": 77, "is_offset": true}, "segment_id": 54}, {"start": {"lat": 59.43401, "lng": 24.76012, "name": "3416853", "address": "Maakri 19, Kesklinn, Tallinn, 10145 Harju Maakond, Eesti", "position": 55, "original_index": 77, "is_offset": true}, "end": {"lat": 59.43341, "lng": 24.759420000000002, "name": "94156642", "address": "Maakri 19, Kesklinn, Tallinn, 10145 Harju Maakond, Eesti", "position": 56, "original_index": 78, "is_offset": true}, "segment_id": 55}, {"start": {"lat": 59.43341, "lng": 24.759420000000002, "name": "94156642", "address": "Maakri 19, Kesklinn, Tallinn, 10145 Harju Maakond, Eesti", "position": 56, "original_index": 78, "is_offset": true}, "end": {"lat": 59.4333, "lng": 24.76001, "name": "3984494", "address": "Maakri 19/1, Kesklinn, Tallinn, 10145 Harju Maakond, Eesti", "position": 57, "original_index": 79, "is_offset": false}, "segment_id": 56}, {"start": {"lat": 59.4333, "lng": 24.76001, "name": "3984494", "address": "Maakri 19/1, Kesklinn, Tallinn, 10145 Harju Maakond, Eesti", "position": 57, "original_index": 79, "is_offset": false}, "end": {"lat": 59.4339, "lng": 24.76001, "name": "94005651", "address": "Maakri 19/1, Kesklinn, Tallinn, 10145 Harju Maakond, Eesti", "position": 58, "original_index": 80, "is_offset": true}, "segment_id": 57}, {"start": {"lat": 59.4339, "lng": 24.76001, "name": "94005651", "address": "Maakri 19/1, Kesklinn, Tallinn, 10145 Harju Maakond, Eesti", "position": 58, "original_index": 80, "is_offset": true}, "end": {"lat": 59.4331, "lng": 24.75949, "name": "3850103", "address": "Maakri 19/2, Kesklinn, Tallinn, 10145 Harju Maakond, Eesti", "position": 59, "original_index": 81, "is_offset": false}, "segment_id": 58}, {"start": {"lat": 59.4331, "lng": 24.75949, "name": "3850103", "address": "Maakri 19/2, Kesklinn, Tallinn, 10145 Harju Maakond, Eesti", "position": 59, "original_index": 81, "is_offset": false}, "end": {"lat": 59.4337, "lng": 24.75949, "name": "3375810", "address": "Maakri 19/2, Kesklinn, Tallinn, 10145 Harju Maakond, Eesti", "position": 60, "original_index": 82, "is_offset": true}, "segment_id": 59}, {"start": {"lat": 59.4337, "lng": 24.75949, "name": "3375810", "address": "Maakri 19/2, Kesklinn, Tallinn, 10145 Harju Maakond, Eesti", "position": 60, "original_index": 82, "is_offset": true}, "end": {"lat": 59.43268, "lng": 24.765, "name": "94002997", "address": "Tartu maantee 33, Kesklinn, Tallinn, 10128 Harju Maakond, Eesti", "position": 61, "original_index": 83, "is_offset": false}, "segment_id": 60}, {"start": {"lat": 59.43268, "lng": 24.765, "name": "94002997", "address": "Tartu maantee 33, Kesklinn, Tallinn, 10128 Harju Maakond, Eesti", "position": 61, "original_index": 83, "is_offset": false}, "end": {"lat": 59.43261, "lng": 24.76587, "name": "94156163", "address": "Juhan Kunderi 8a, Kesklinn, Tallinn, 10128 Harju Maakond, Eesti", "position": 62, "original_index": 84, "is_offset": false}, "segment_id": 61}, {"start": {"lat": 59.43261, "lng": 24.76587, "name": "94156163", "address": "Juhan Kunderi 8a, Kesklinn, Tallinn, 10128 Harju Maakond, Eesti", "position": 62, "original_index": 84, "is_offset": false}, "end": {"lat": 59.43529, "lng": 24.7649, "name": "3782314", "address": "Pronksi 11, Kesklinn, Tallinn, 10124 Harju Maakond, Eesti", "position": 63, "original_index": 85, "is_offset": false}, "segment_id": 62}, {"start": {"lat": 59.43529, "lng": 24.7649, "name": "3782314", "address": "Pronksi 11, Kesklinn, Tallinn, 10124 Harju Maakond, Eesti", "position": 63, "original_index": 85, "is_offset": false}, "end": {"lat": 59.43482, "lng": 24.76514, "name": "94004128", "address": "Gonsiori 17, Kesklinn, Tallinn, 10124 Harju Maakond, Eesti", "position": 64, "original_index": 86, "is_offset": false}, "segment_id": 63}, {"start": {"lat": 59.43482, "lng": 24.76514, "name": "94004128", "address": "Gonsiori 17, Kesklinn, Tallinn, 10124 Harju Maakond, Eesti", "position": 64, "original_index": 86, "is_offset": false}, "end": {"lat": 59.43599, "lng": 24.76547, "name": "94004499", "address": "Pronksi 7, Kesklinn, Tallinn, 10124 Harju Maakond, Eesti", "position": 65, "original_index": 87, "is_offset": false}, "segment_id": 64}, {"start": {"lat": 59.43599, "lng": 24.76547, "name": "94004499", "address": "Pronksi 7, Kesklinn, Tallinn, 10124 Harju Maakond, Eesti", "position": 65, "original_index": 87, "is_offset": false}, "end": {"lat": 59.4363, "lng": 24.76984, "name": "94154168", "address": "Friedrich Reinhold Kreutzwaldi 9, Kesklinn, Tallinn, 10124 Harju Maakond, Eesti", "position": 66, "original_index": 88, "is_offset": false}, "segment_id": 65}, {"start": {"lat": 59.4363, "lng": 24.76984, "name": "94154168", "address": "Friedrich Reinhold Kreutzwaldi 9, Kesklinn, Tallinn, 10124 Harju Maakond, Eesti", "position": 66, "original_index": 88, "is_offset": false}, "end": {"lat": 59.4376, "lng": 24.77184, "name": "94155106", "address": "Raua 53, Kesklinn, Tallinn, 10120 Harju Maakond, Eesti", "position": 67, "original_index": 89, "is_offset": false}, "segment_id": 66}, {"start": {"lat": 59.4376, "lng": 24.77184, "name": "94155106", "address": "Raua 53, Kesklinn, Tallinn, 10120 Harju Maakond, Eesti", "position": 67, "original_index": 89, "is_offset": false}, "end": {"lat": 59.43834, "lng": 24.77639, "name": "4507772", "address": "Johann K\u00f6leri 1, Kesklinn, Tallinn, 10150 Harju Maakond, Eesti", "position": 68, "original_index": 90, "is_offset": false}, "segment_id": 67}, {"start": {"lat": 59.43834, "lng": 24.77639, "name": "4507772", "address": "Johann K\u00f6leri 1, Kesklinn, Tallinn, 10150 Harju Maakond, Eesti", "position": 68, "original_index": 90, "is_offset": false}, "end": {"lat": 59.43938, "lng": 24.9438, "name": "Depot", "address": "Depot Location", "is_offset": true}, "segment_id": 68}], "extracted_duration": null, "extracted_distance": null, "precalculated_polylines": [{"polyline": "BGq57rxDs8tyvB1G_WnL_nBnG7L_EzF7BvCU3InBnQ3I7fvH_Y7G7avMnuBnBvHT_EkDzZwC7BkD_E8B7GU3N4IzZsJjN4S_dw0B3zC0e3wBwtC37D0UvgB8uBrqC8anuBsJ3NwH3N4D8B8BAwCnBkDjDwCnG4I7G8G3IgFrJ0U7a8GnG4N3I0K3DkInB0FwCsTsEkIsE8GwMkD4NkD0F8B8B4D8B4DA4D7BkDrEoBjDwC_JU_JnBvH3D3I8BnpBwC_YTzFgF3X8LrnBwgBnxCgK3X8G3S0K3XkIzU8GvRsO3ckIrOoG_J0PzUgPnGgKkDkDwCsEoG8BsEwCsJoBgKAsJnBwMjI4SnLgP_iB8a_E4DjIsErEoB3IU3DT_EjD7GnG_J_TvC7GjDrJ7Lj1BjI7Q_ErY3c7yEvWvwDvH_nBnG7fvRn7CvH7kB7G3hBzFzeUjcjDr7BUrd8BnkBgF3wBkDriB4DrTgK72C4D_Y0Fze4DzPkI3c4I_YgFvMwW7uBwHvMokBz8BkN7V4NnasJ7V0FvR4I7kBkD7VoBztBT_TjDvbzK3_BrJzyBnG7fnBnGnBnG3InpBnG_iBzF_d3N_lC74Bn-IrJ3rBnV7qDzFjc3N_lC3wBr0HjI7pB_EzezFvgBzF3mB7G_gC3D3wBjD3_BnBn9BT_iBT7nCnBv0BvCvrDTzPT_OnGz1C3DrdvHrsBzZnwFzK_0Cze_xG_OjxDzK7iC7QjsD7LzwCrJ3kCjDriBrEj1BvCjuCUv9ETnzBjDv8CAjITnVTzjBrJr9F_E3lEvH7wF7GnyEnG_zFnGvuEvCvtCjDvoCrJz5F7B36B3IrnGArT_E7zB7G7uBzFzerd_3DjmBvpErY3zC7uB_pFn9Bj_GrE_Ovb3iDvHvgBrEnVnGvqB_E36BvCnzBU_xBwM7kGU7GkDj_BUnVTjX_E3zC3DnfjIn4BrEjXvM31BzF3S3N3rB3N_nBz1CjuHvCvMvRvvBnQjwBrEvRnG7f_EzjBAzP8BvgB8B3NkDjN4DrO4I3XgPrnBkDnLgFrYgFjmBoBrJkDjXgF7kBgC9P", "distance": 10974, "duration": 727}, {"polyline": "BG8-vrxD60sovBoEhiBkIvCwC7B4InG0CuW", "distance": 89, "duration": 15}, {"polyline": "BGk5wrxDy-rovBzCtW8BnBwMrJkNrJkcrTwH_EoF1tC", "distance": 212, "duration": 37}, {"polyline": "BG86yrxDiunovBwD1zB4D70DT_E0FvWrJjG", "distance": 200, "duration": 47}, {"polyline": "BG49yrxD8jhovBsJkGzFwW_EsO_dw1DzFkcvC8avCnB7QrJnQ7GoB_J8BjNwCzUU_E0P_8DoGjwBoB_JsEvlB4DzegKkDkIsEwCsE8B0UkDwHkD4N_EzF3DwCnGopB3D4SwR8B", "distance": 761, "duration": 175}, {"polyline": "BG4zyrxDsuhovBvR7B4D3SoGnpB4DvCgF0FjD3NjDvH7BzUvCrEjIrE_JjDgFjmBoG7zB4NwMoL8LoLgK8G8BwMoGjD4cnBkN_E4rBTgKgK0nC", "distance": 536, "duration": 153}, {"polyline": "BGk7zrxD01hovB_JznCnBgFnBsO_EofvCsJzFwW_EsO_dw1DzFkcvC8avCnB7QrJnQ7GoB_J8BjNwCzUU_E0P_8DoGjwBoB_JsEvlB4DzegKkDkIsEwCsE8B0UkDwHkD4NvCkSUgF6E6C", "distance": 793, "duration": 159}, {"polyline": "BG-3yrxDytgovB5E5CT_EwCjSjD3NjDvH7BzUvCrEjIrE_JjDgFjmBoG7zB4NwMoL8LoLgK8G8BwMoGjD4cnBkN_E4rBTgKnBgFnBsO_EofvCsJzFwW_EsOvF0V", "distance": 511, "duration": 119}, {"polyline": "BGg3yrxDwkjovBvY8_CvRjI6KlvC", "distance": 205, "duration": 59}, {"polyline": "BG63xrxDitjovB5KmvCwRkIzFkcvC8agFUsEwHwCkIqEgU", "distance": 207, "duration": 79}, {"polyline": "BGymyrxD0_oovBiFkXwCgKsEgZ0KouBsJ0ekI8V0KgZmHqP", "distance": 209, "duration": 28}, {"polyline": "BGug0rxD6kvovBucq8BuFqP", "distance": 92, "duration": 13}, {"polyline": "BGqi1rxDuwxovBqNmlB4DkSkDgP3N_Jna3X", "distance": 152, "duration": 26}, {"polyline": "BGwu0rxDg1yovBuF-E", "distance": 11, "duration": 2}, {"polyline": "BG-z0rxD-5yovB6U6S4NgKkhBoa8iC4_BrO0tBrJokBnBsE7GwbnB4DrOw0B7BoGzFsTnGoVvH8ajIge3D0P", "distance": 564, "duration": 82}, {"polyline": "BG8p2rxDky_ovB4DzPkI_dwH7aoGnV0FrT8BnGsOv0BoB3D8GvboBrEsJnkBsOztB4D4DgyBsxB", "distance": 409, "duration": 56}, {"polyline": "BGow6rxD8l4ovBwW4SoBnqD4D31G", "distance": 336, "duration": 68}, {"polyline": "BG4r7rxDgzuovBA7Q3DvC_dvR9KmkC", "distance": 143, "duration": 40}, {"polyline": "BGi_5rxDqyvovBhOu3CTgFjO05C", "distance": 174, "duration": 75}, {"polyline": "BGoi5rxDso1ovBjCwNzF8a4D4DgyBsxBwW4S0Z0FosC0K0FvMkD7L_OrgC_EnV_Tj4C3DrTnG7uBzFztB7BvRvC7VnQrmETnG8B7GAvHvCvbnB3X7BvWT_J7BzPwCrO8B7G4D3IsEvHgK_E4IvCkDT0ZoB8GTgKoLwC0PoG8GTgPUsOeoG", "distance": 1173, "duration": 220}, {"polyline": "BG64-rxDwlnovByBgKoG4N8BzUU7Q7B_T7B7fA_O7B_T7B7V3DvW7L_7B3D7Q3DvHjDvM1BlH", "distance": 288, "duration": 65}, {"polyline": "BG2_9rxDus_nvB1CxL3D3NvCrJ3DnQ_J_nBzF3X_EnavCzP7BrO7BnVT_YjDoB1IpC", "distance": 237, "duration": 39}, {"polyline": "BG2r8rxDmy4nvB2IqCkDnBUgZ8BoVnG4DrE0F_T0KzK0FnL8G7BnB7BjN", "distance": 180, "duration": 59}, {"polyline": "BG4h7rxD0z6nvB8BkN8BoBoL7G7BzFjDrT_EjhBLtO", "distance": 107, "duration": 33}, {"polyline": "BGsm7rxDyy4nvBH5LsEnpB4D7fkD_dsE_Y4DnasJ_vCwCjc7BriBrJgFrJgFrJsEnGkD_OwHvMgFzU4IrTsJ7BvMvCvRjD7avCvWrEzUrEjIvC7BnGAzKUzRlO", "distance": 650, "duration": 189}, {"polyline": "BG8l3rxDuysnvBnOtL7G3IrEvM0F7QwC_JwC7QwC_YwCzZoQgFkNkD4I8BgFAAwRAo9BUsTU4XA4IwC0e4DwgB3D8VvCgKzF8QnpBTA3mBUvMkDnGkD3DjD4DjDoGTwMzKnBrEnBvCrETrJ3DnQvHnQnGvM_ErJnGjIrE7G_E3DnGjD_ErEwC7Q8BpT", "distance": 807, "duration": 399}, {"polyline": "BGs60rxDujrnvB7BqTvC8QgFsEoGkDgF4DsE8GoGkIgFsJoGwMwHoQ4DoQUsJwCsEsEoB0KoBUvMkDnGkD3DjD4DjDoGTwMA4mBnQU7LA3NTzKTrE3SnGrY_J3mBvH7avC3IrE_JkDzUkD3SsEvlBwCjSwCvWUjN8GnBkSnBgKAwHAsEoBoGU4IsE8LkDoQgFkNkD4I8BgFA4IvMUr2BU_nBUjzCTzeT7LAzPnBj6BjDnVvCrsBnBvR7BvRA_JkDjX0FvMwCjDkDnBwCA4DoBwMkIoLoG0F7B4DkD8GsEsO0FsOwC4IUwMAge3DgerEwHnBgU_E8LjDkIoQ4D8QrJ4XjI0ZrEgPvHgZjDgK_JokBnG0U_EgU_EwWrE4XjDsTnG03BjIjDzFjDjInGjIzFnVvR3IvH", "distance": 2084, "duration": 683}, {"polyline": "BG8_6rxDwgknvBzKzKhFxH", "distance": 33, "duration": 8}, {"polyline": "BGmw6rxDqujnvBiFyH0K0K4IwHoVwRkI0FkIoG0FkDkIkDnB0ZnBofA8foBge8BsTsE8f0FkhBoB8G8B0KoG8kBwCsTwCsOoGTwHoBgF8BgF4DwMkIkX8L", "distance": 528, "duration": 105}, {"polyline": "BGow_rxDkpvnvBsEoBoGnB0FkD4IgFwHkDTwW7LwH3SwMrYwM7BsET0FoB4NvCwH_E3cvH_xBrEnf7BjN7BnLrO3D_EA7G8BvHoGnVkSrE8B7BoBrJgFrJgFrJsEnGkD_OwHvMgFzU4IrTsJ7BvMvCvRjD7avCvWrEzUrEjIvC7BwC0e4DwgB", "distance": 811, "duration": 225}, {"polyline": "BGgu4rxD8ivnvBjDkSvCgKzF8QnpBTnQU7LA3NTzKT4DgPwHgjBgK8uBoBoGoG4cwC8L8B4IgKgoB4D8QgPkkC4I3D4NvH8QzKsO7LwM_J4N7L4DjD8GzFjI_2BrT3gErE_d7BvMvCvRjD7avCvW7B3Xof7BkNnBwCsnBzFsE", "distance": 1086, "duration": 316}, {"polyline": "BGg75rxDwvunvB0FrEvCrnBjNoBnf8BnBvgBTj4CA3IAzUUr2BU_nBUjzCTzezKzFA8QA0UAg6CAwyCUoQAwRAo9BUsTU4XA4IgCoY", "distance": 821, "duration": 198}, {"polyline": "BGsq4rxDo4tnvBQsG4DwgB3D8VvCgKzF8QnpBTA3mB", "distance": 193, "duration": 36}, {"polyline": "BGw52rxDwovnvBA4mBnQU7LA3NTzKT4DgPwHgjBgK8uBoBoGoG4cwC8L8B4IgKgoB4D8QgPkkC4I3D4NvH8QzKsO7LwM_J4N7L4DjD8GzFjI_2BrT3gErE_dvHwCjIA", "distance": 807, "duration": 287}, {"polyline": "BGgu4rxDwwwnvBkIAwHvCsTrJ0U3IkJ1D", "distance": 118, "duration": 22}, {"polyline": "BG4u6rxDm4vnvBjJ2DzU4IrTsJvHwCjIAnLTzWL", "distance": 178, "duration": 52}, {"polyline": "BGks3rxDwvwnvBzSHnQU7LA3NTzKTnGAvHnB7LrE7GjDrJrEjDnB7GjD3IrEvCnBjI3DzFvCrOvHjIrE_J_EjDkXnBkN5VrJ", "distance": 400, "duration": 97}, {"polyline": "BGu9wrxDo7vnvB6VsJ7BsOjD0jBvCoQjDkXViF", "distance": 129, "duration": 20}, {"polyline": "BG-nxrxDijznvBpEmf7B4SrEsdAgKnGkrBjIk_B_EkS7Q03BjInGrEzFsE7L_Y7f", "distance": 352, "duration": 61}, {"polyline": "BGg4urxD445nvBgZ8frE8LsE0FkIoG3DwM_E8QrOwqBvH8VzKwbsE0FkNwR0FwHwCnLoL8GoQkNnQjNnL7GkDjXoB3DkDUoS2I", "distance": 452, "duration": 281}, {"polyline": "BGojwrxDur_nvBnS1IjDTnB4DjDkXoL8GoQkNnQjNnL7GvCoLzFvHjNvRrEzFvMokBrJgejI4X3IkcvM4hBtT65B", "distance": 458, "duration": 268}, {"polyline": "BGmpsrxDq7lovBhHkV", "distance": 23, "duration": 3}, {"polyline": "BGkisrxDuwmovBvDuKjDjD7L3N7VjXzF7GzFzFzYnf", "distance": 161, "duration": 26}, {"polyline": "BG81prxDknkovBnR7VvHrJvCjIsJjXkIzUsJjX4D_JoLvb0FnG4D3I8azhCwMjhBkIrTwHvRsJ7V4IzUgFnL0F7QkDnL0K8LwMkNsEgFssB03BsE0FkIoG3DwM_E8QrOwqBvH8VzKwbvMokBrJgejI4X3IkcvM4hB_ds5CjDjD7L3N7VjX_EgPnLwlBU8B8BwB", "distance": 1162, "duration": 205}, {"polyline": "BGgsqrxD4qnovB7BvBT7BoLvlBgF_OzF7GzFzF7pBj1BvHrJvCjIsJjXkIzUsJjX4D_JoLvb0FnG4D3I8azhCwMjhBkIrTwHvRsJ7V4IzUgFnL0F7QkDnL0K8LwMkNsEgFssB03BsE0FkIoG3DwM_E8QrOwqBvH8VzKwbvMokBrJgejI4X3IkcvM4hB_ds5CnBkDzFsTzDuK", "distance": 1197, "duration": 205}, {"polyline": "BGwxrrxDwjoovB7GgUjSg3BjD0K4DkIoB4NzFokBnB4X3DwCjD8BjD8BzF3IvgBrxBj1BrvC_EnLnG3IjInL_Y0yB3DnG0FvMoBjDoGrOwRzoB4IjXkDnGkDjI4Nrd0K3XwW7zBsJjXkIzUsJjX4D_JoLvb0FnG4D3I8azhCwMjhBkIrTwHvRsJ7V4IzUAzKnBvH7kBk9CnBkDnL8ajXs7B3D4IvCsJvC0KnLwb3DgKrJkXjI_O_JvWrO_YT7LnLvWvHrTT_ErE3SjD_J_Ojc7G7LjN7V3X89B3D4I3DkIrFgL", "distance": 1814, "duration": 386}, {"polyline": "BGwolrxD859nvBrIkRvH3X3I3X8B7LsEwC0F3hBrEjDzFsiB7B8LjD4SvCoLrEvMzFvM7LnVnGjIvHjIzFrEnG7B3SzKztB3mBnGjDrET3DUvHkD_TkNnG4DrOkIjc4NjIoBrE8BjNkIrT4NjD8BvHwC3ITvH7BzFvCnG_E3I3I7G_E_EnB3NnBrEoBrEnBjNwCjDAjIzF_EjIvCvgBTnQT7VnB_dnBzjBzFjxDnBnarEoBvHoBvHzFrET_EUvRgF_EUnL3DrErEzF3I3DrJrT3_B8BvHAzF7B3IvCzFrE7B3DU7BoBjDgFzFsJ_EkI7BsE3NkN3DwCrEUjDT_E3D3DzFnLzUnQ7azU3czKjN7VrYvjC_7BzKzK_J7Lna3hBzUrY7QrTvlBjrBzPnQ0FrYoGzUoL_iB4D7LoBrEU7BkIzZgF_OjDrEnBjDA_EgF_O", "distance": 2280, "duration": 310}, {"polyline": "BG4lsqxDkpgnvB_EgPAgFoBkDkDsE_EgPjI0ZT8B4I0KwbsY0E4F", "distance": 157, "duration": 46}, {"polyline": "BGogtqxD83jnvBzE3FvbrY3IzKU7BkIzZgF_O8LnkB4DnLgK_dsE7LoGrO4InQsJ_OgKrO8QnV4NnQ4SnV0K7GwCwbkX4jF8Lg8B8VsvCkI0egF4SkSgmCwbsjDoL4mB0Zk4C7BsET4DUwHkDsEsE8BoG3DgFjD8GzFwCrE8BvHAzF7B3IvCzFvC_JjD3I7B3IrEjc3DjSvM3rBrEnGwH7GgFrEwCwHgFnGwCjDqF-T", "distance": 1402, "duration": 221}, {"polyline": "BGyv1qxDumrnvBpF9TvCkD_EoGvCvH_EsEvH8G3Nr7B3DjN3DnQvgBnvDT7GUnG8BrE4D3DoLrOoQrOgFTwR7LwWnLoLjIsEjI7BrO_EnfzF7pB7BrOrE7avHv0BUzK7GrgCrJ7uBA_Y8BvHU_JoQvHwM_E4cjN4rBjSoGvCoBzKAjXzFjrBnBnL8BnBoBvCoBrETrE8BnBkS3IsOnG8GAgFnB0CyhB", "distance": 1209, "duration": 226}, {"polyline": "BG8u5qxDmhzmvBzCxhBgKjI0PzFgoB7LsJnG8BkDwCoBoBoLwHoiC8BsOwW3I49CvlB41BjXgjB_OgKjD8GT4DUkIUoGoBoGUgFAkI7BsO3DoL3DsdvR8LzFwH4wBwHouB8G4rBU0F0FgjB8GssB4Ig3B4D4X4DkX4D0Z8BwM4Doa0F0jB4D4XoGokBwC0ZoB0jBjDkc3DoQ_EsTvCsTjD0PjNnG8BrOoB3rBzFjSjD_JrEvH", "distance": 1586, "duration": 345}, {"polyline": "BG8znrxDkshnvBsEwHkDgK0FkSnB4rB7BsOkNoGkDzPsJrT4DnG0F7G8G_EkN_EkI4XgKsdoL0e0KgZ8LjS0UzoBoGvM8G7Q0K7QgU7kBsErJgPvb4X_xBsEjIgUriBwHrOwMrTsEjI4DnGwCrE8GnLkD_ErEnLjD3IkNnVkX7kB4S3cwCrEnB_E_J3c3DnLnGoLrJ0PnG0KvCoGnLgP", "distance": 1076, "duration": 276}, {"polyline": "BG00wrxDot4mvB_JgP3NwWzFrOrEoGzF4IjDsE0F4N4D4IkNwgBkI0UgFoLsnBg_CkDoBsETgFnB4InBoVvC7BnfnGjsD8B3D4FlK", "distance": 537, "duration": 127}, {"polyline": "BGk_yrxD-v6mvB3FmK7B4DoGksD8BofnVwC3IoBrJgUoBwWUsiBoB8QA4NToLnB4S7B8f3DgjB3I_EzFzF_EvCzFT7BoB0FwR4D8Q0FwMtHmc", "distance": 525, "duration": 112}, {"polyline": "BGygxrxD-3nnvBuHlczFvM3D7QzFvR8BnB0FUgFwC0F0F4IgFwHoG4NoLjD0P3DkS", "distance": 205, "duration": 54}, {"polyline": "BGoiyrxD0snnvB4DjSkDzP3NnLvHnG3I_EzFzF_EvCzFT7BoB0FwRsBkG", "distance": 150, "duration": 49}, {"polyline": "BGggxrxDwkmnvBsC4K0FwMtHoc", "distance": 55, "duration": 11}, {"polyline": "BGygxrxDg4nnvBuHnczFvM3D7QzFvR8BnB0FUgFwC0F0F4IgFnB0K7B0UzF4cjIwbvHoV_E4N7LwgB3IsYnGsTjNwlBkI4I4D7Q8GnVoG_TwR7uBgKjc4NrnByE_Y", "distance": 610, "duration": 171}, {"polyline": "BG41xrxDsmnnvB4Dvb8BnLvHnG3I_EzFzF_EvCzFT7BoBzF0F_JkI_D4D", "distance": 141, "duration": 31}, {"polyline": "BGslwrxDs-lnvBnRoQnGkInL4D_YTvRT_EU3DnBUvM7BrJgF3IoG3IwHrOkI7Q4InVgUrxBkIjSsJ_TsErJgK8kB8BsJoVkzCToGjDsJ8BnB0FUgFwC0F0F4IgFnB0KbqJ", "distance": 603, "duration": 128}, {"polyline": "BG4xxrxDqtmnvBfqLzF4cjIwbvHoV_E4N7LwgB3IsYnGsTjNwlBzFsY7Lw0BvC0KjSo2CrEsTzFwb7GofgF4D8GrdoGjcsEjXoG3c8G7a0KoLqF0G", "distance": 657, "duration": 167}, {"polyline": "BGotvrxD0xxnvBzF8Q", "distance": 18, "duration": 6}, {"polyline": "BG0nvrxDwiynvB0F7QvHrJzKnLwH_dsEvRwMrTsErEgFjD8GvC8GAgP7B4N4IoQsJgKgFkIsEsOwH0FwCkI4DwCoB4IsE8GkDkDoBsJsE8GkDgI-C", "distance": 425, "duration": 173}, {"polyline": "BGsz0rxD-rwnvB8DuBwHoBoGA4DgPwHgjBgK8uBoBoGoG4cwC8L8B4IgKgoB4D8QgPkkCzUoGvMwC7LT7QjDrYzKvHjD7QjI7LnGvH3D7Q7GoBvMkDjXwCrT8BjSkD3XsJrqCkGruB", "distance": 780, "duration": 161}, {"polyline": "BGsrzrxD4oxnvBYvFoBrJ4D3c8GkDkDoBsJsE8GkD8LsEwHoBoGA4DgPwHgjBmCkK", "distance": 196, "duration": 57}, {"polyline": "BGuy1rxD4qynvB6H4kBoBoGoG4cwC8L8B4IgKgoB4D8QgPkkCzUoGvMwCiDwpB", "distance": 314, "duration": 63}, {"polyline": "BG6k2rxDs26nvBhDvpBwMvC0UnG4I3D4NvH8QzKsO7LwM_J4N7L4DjDoQsoDgKwjC4DkIwCsTsEkcvW4NnGvW7BvCvCA_E4NTgF", "distance": 568, "duration": 101}, {"polyline": "BG405rxDs0-nvBU_EgF3NwCA8BwCoGwWwW3NoG4mBwHgyB0FgoBnB4IkD4X4D8kBoBwMoB8LzFgUjNnL7G8GzQssB", "distance": 414, "duration": 82}, {"polyline": "BG4s6rxDsnnovB3H0UjI8VzoBg4Dj6BjkCvH4DnQ8a3rB4kCrdssB7L4SzKgKrTkSvH4IrJ8GrO4D7GnBnQrJjD3D_Y7fvCvCzFnGnBsJ_EkmB_EsYjDoL_OsnB3I4X3DsOjDkN7B4N7BwgBA0PTgZoB0e8BkX0FsiBsEwRwHoV8L0oBsOgtB4IkXgZwjC8LgjB8fg1CsJ8aoV4kCoL8uBsEsYkIk6BsEsxB8BozBA4XnBsdjD46BTgF7B8kBjI42DnB0hCwCwjCgFoiCkIghCkDgP8Lg3BoQ46BsJsiB46Bs2Gg8Bg3G4uCo5I4IopB4Ik6B8B4S0Fw-BwHktFoLksI4D8gD4I0jGwHkyF0FklEwHo1FkIsiGoG40EoBkhBkDkxDT4oFUkmBwConC8BofgFk_BoGw-B0FopB8GssBoQsoDgKwjCwMkuC4SsyDgegoG8ak8FgK0wC4D4wBoBgZoBkhB8BkmBoBsxBUghCwCgkDUkS8B8sCoBwW0FwtC4IosC4D4X0FokBoQo2CsiBktFwM89B4NwoC4DgUwH4mB0K41B0PwoC8pB4wGsYk7DoGge0Ko4B8B4IoG0ewHsnBoGsdsTwmDoB0PUwRT4S7B8VrEsYnGkXrJ0ZzPof_OoazP0ZrT4c3mBsxBjIwH7QsJ_OgFrJwC3SwC7GwCnGkDjIoGjNwMzF8B7BrEvHjIjDvC7GjD7GTvCUrEwCjDkDjIkN_E0PnBsOUwMwCkNwCwHgFkIgFoGsOo9BkXknD4Nw5B0FsTgF4N0K8V0FsdsEoVwCkNgFoV8G4hBgFoakDoQ8GokB8G4mB8L08BoL84B0P0wC0Ks2Bofk-EsTgkD4D4S8LslC4DoagK0hC7Gw5B3D8QrE8L_EsJzFkI7GoG_EkDjIkDvMwCnVoBnBvH3D3I3D3D3DnBjDAjDoB7B8BzKTzUjDnGU3I4DjIoBzK4D3N4I7GoGzU8a7LoGvCU7GT7B3D3D3DrET3D8BjD0FnB4IAoG7BkI_JwgB7aouB7uBsqCzUwgBvtC47Dze4wBv0B4zC3SgerJkNjNwMrE7BrEA3DsEjDwHnB8GA8GoBwH8BsEwCkD8BgPwCwMUgFoBwHwMouB8G8awHgZ4I8foBoQT4I8BwCgF0FoG8LoLgoB8Pu2B", "distance": 11625, "duration": 904}], "unmapped_segments": [], "total_distance_meters": 58360, "total_duration_seconds": 10269}, {"id": "unmappable_data", "unmappable_routes": [], "unmappable_segments": []}];
+
+                // Extract unmappable data
+                const unmappableData = routeData.find(r => r.id === 'unmappable_data');
+                // Remove the unmappable data from the routeData array
+                const actualRouteData = routeData.filter(r => r.id !== 'unmappable_data');
+
+                updateStatus(`Loaded ${actualRouteData.length} routes`);
+
+                // Set up unmapped addresses panel if there are any
+                if (unmappableData && (unmappableData.unmappable_routes.length > 0 || unmappableData.unmappable_segments.length > 0)) {
+                    const unmappedToggle = document.getElementById('unmapped-toggle');
+                    const unmappedPanel = document.getElementById('unmapped-panel');
+                    const unmappedList = document.getElementById('unmapped-list');
+
+                    // Show the toggle button
+                    unmappedToggle.style.display = 'block';
+                    unmappedToggle.textContent = `Show Unmapped Addresses (${unmappableData.unmappable_segments.length})`;
+
+                    // Toggle panel visibility
+                    unmappedToggle.addEventListener('click', function() {
+                        if (unmappedPanel.style.display === 'none' || !unmappedPanel.style.display) {
+                            unmappedPanel.style.display = 'block';
+                            unmappedToggle.textContent = 'Hide Unmapped Addresses';
+                        } else {
+                            unmappedPanel.style.display = 'none';
+                            unmappedToggle.textContent = `Show Unmapped Addresses (${unmappableData.unmappable_segments.length})`;
+                        }
+                    });
+
+                    // Populate unmapped list
+                    if (unmappableData.unmappable_routes.length > 0) {
+                        const routeItem = document.createElement('div');
+                        routeItem.className = 'unmapped-item';
+                        routeItem.innerHTML = `<b>Completely unmapped routes:</b> ${unmappableData.unmappable_routes.join(', ')}`;
+                        unmappedList.appendChild(routeItem);
+                    }
+
+                    // Add individual unmapped segments
+                    unmappableData.unmappable_segments.forEach(segment => {
+                        const segmentItem = document.createElement('div');
+                        segmentItem.className = 'unmapped-item';
+
+                        let locationInfo = '';
+                        if (segment.start_name && segment.end_name) {
+                            locationInfo = `${segment.start_name} to ${segment.end_name}`;
+                        } else {
+                            locationInfo = `${segment.start} to ${segment.end}`;
+                        }
+
+                        segmentItem.innerHTML = `<b>Route ${segment.new_route_no}:</b> ${locationInfo}`;
+                        unmappedList.appendChild(segmentItem);
+                    });
+                }
+
+                // Helper function to format address with line breaks
+                function formatAddress(address) {
+                    if (!address) return 'No address available';
+
+                    // Split address at commas and format with breaks
+                    return address.split(',')
+                        .map(part => part.trim())
+                        .filter(part => part.length > 0)
+                        .join('<br>');
+                }
+
+                // Function to render pre-calculated routes onto the map
+                function renderPreCalculatedRoute(route) {
+                    return new Promise((resolve, reject) => {
+                        // Check if we have pre-calculated polylines
+                        if (!route.precalculated_polylines || route.precalculated_polylines.length === 0) {
+                            reject(new Error(`No pre-calculated data for route ${route.id}`));
+                            return;
+                        }
+
+                        updateStatus(`Rendering pre-calculated data for route ${route.id}`);
+
+                        let totalDistance = 0;
+                        let totalDuration = 0;
+                        let validSegments = 0;
+
+                        // Draw all pre-calculated polylines
+                        route.precalculated_polylines.forEach((segment, index) => {
+                            if (segment && segment.polyline) {
+                                try {
+                                    // Standard HERE flexible polyline
+                                    const lineString = H.geo.LineString.fromFlexiblePolyline(segment.polyline);
+
+                                    const routeLine = new H.map.Polyline(lineString, {
+                                        style: {
+                                            lineWidth: 5,
+                                            strokeColor: route.color,
+                                            lineCap: 'square',
+                                            lineJoin: 'round'
+                                        }
+                                    });
+
+                                    mapObjects.addObject(routeLine);
+
+                                    // Add to totals
+                                    totalDistance += segment.distance || 0;
+                                    totalDuration += segment.duration || 0;
+                                    validSegments++;
+                                } catch (e) {
+                                    console.error(`Error rendering polyline for segment ${index}: ${e.message}`);
+                                }
+                            } else if (route.unmapped_segments && route.unmapped_segments.includes(index)) {
+                                // This is an unmapped segment, just log it
+                                console.log(`Segment ${index} of route ${route.id} could not be mapped`);
+                            }
+                        });
+
+                        // Use pre-calculated totals if available
+                        if (route.total_distance_meters && route.total_duration_seconds) {
+                            totalDistance = route.total_distance_meters;
+                            totalDuration = route.total_duration_seconds;
+                        }
+
+                        // Only report success if we rendered at least one segment
+                        if (validSegments > 0) {
+                            resolve({
+                                totalDistanceKm: (totalDistance / 1000).toFixed(2),
+                                totalDurationHours: (totalDuration / 3600).toFixed(2),
+                                totalDurationMinutes: (totalDuration / 60).toFixed(2),
+                                validSegments: validSegments,
+                                totalSegments: route.precalculated_polylines.length
+                            });
+                        } else {
+                            reject(new Error(`No valid segments could be rendered for route ${route.id}`));
+                        }
+                    });
+                }
+
+                // Create customer marker using standard HERE Maps marker
+                function createCustomerMarker(customer, index, routeId, routeColor) {
+                    try {
+                        // Create a simple colored marker using HERE Maps built-in markers
+                        const marker = new H.map.Marker(
+                            {lat: customer.lat, lng: customer.lng},
+                            {
+                                // Use a standard marker with a custom color
+                                icon: new H.map.Icon(
+                                    `<svg width="24" height="24" xmlns="http://www.w3.org/2000/svg">
+                                        <circle cx="12" cy="12" r="10" fill="#0078D4" stroke="white" stroke-width="2"/>
+                                        <text x="12" y="16" font-size="11" font-weight="bold" text-anchor="middle" fill="white">${index+1}</text>
+                                    </svg>`,
+                                    {anchor: {x: 12, y: 12}}
+                                )
+                            }
+                        );
+
+                        // Prepare info window content
+                        const offsetInfo = customer.is_offset ? 
+                            "<p><span class='tag' style='background-color:red;color:white;'>Offset</span> Position adjusted to fix duplicate coordinates</p>" : "";
+
+                        // Updated infoContent with better formatting
+                        const infoContent = `
+                            <div class="info-window">
+                                <h3>${customer.name}</h3>
+                                <p><span class="field-label">Route</span>${routeId}</p>
+                                <p><span class="field-label">Stop #</span>${index + 1}</p>
+
+                                <div class="address-block">
+                                    <span class="field-label">Address</span>
+                                    ${formatAddress(customer.address || 'No address available')}
+                                </div>
+
+                                <p><span class="field-label">Coordinates</span>${customer.lat.toFixed(5)}, ${customer.lng.toFixed(5)}</p>
+                                ${offsetInfo}
+                            </div>
+                        `;
+
+                        // Set data for info bubble
+                        marker.setData(infoContent);
+
+                        // Add customer marker to the map
+                        mapObjects.addObject(marker);
+
+                        return marker;
+                    } catch (e) {
+                        updateStatus(`ERROR creating customer marker: ${e.message}`);
+                        console.error('Customer marker error:', e);
+                        return null;
+                    }
+                }
+
+                // Create depot marker using standard HERE Maps marker
+                function createDepotMarker(depot, routeId, routeColor) {
+                    try {
+                        // Create a simple colored marker using HERE Maps built-in markers
+                        const marker = new H.map.Marker(
+                            {lat: depot.lat, lng: depot.lng},
+                            {
+                                // Use a standard marker with a custom color
+                                icon: new H.map.Icon(
+                                    `<svg width="26" height="26" xmlns="http://www.w3.org/2000/svg">
+                                        <circle cx="13" cy="13" r="11" fill="white" stroke="black" stroke-width="2"/>
+                                        <text x="13" y="17" font-size="12" font-weight="bold" text-anchor="middle" fill="black">D</text>
+                                    </svg>`,
+                                    {anchor: {x: 13, y: 13}}
+                                )
+                            }
+                        );
+
+                        // Prepare info window content with improved formatting
+                        const infoContent = `
+                            <div class="info-window">
+                                <h3>Depot - Route ${routeId}</h3>
+                                <p><span class="field-label">Address</span>${formatAddress(depot.address || 'No address available')}</p>
+                                <p><span class="field-label">Coordinates</span>${depot.lat.toFixed(5)}, ${depot.lng.toFixed(5)}</p>
+                                <p><span class="field-label">Role</span>Starting and ending point for deliveries</p>
+                            </div>
+                        `;
+
+                        // Set data for info bubble
+                        marker.setData(infoContent);
+
+                        // Add depot marker to the map
+                        mapObjects.addObject(marker);
+
+                        return marker;
+                    } catch (e) {
+                        updateStatus(`ERROR creating depot marker: ${e.message}`);
+                        console.error('Depot marker error:', e);
+                        return null;
+                    }
+                }
+
+                // Create sidebar route card
+                function createRouteCard(route, routeInfo) {
+                    // Create route card container
+                    const routeCard = document.createElement('div');
+                    routeCard.className = 'route-card';
+
+                    // Create route header with color background
+                    const routeHeader = document.createElement('div');
+                    routeHeader.className = 'route-header';
+                    routeHeader.style.backgroundColor = route.color;
+
+                    // Format route ID and location - FIX: Remove decimal places
+                    let routeId;
+                    try {
+                        routeId = Math.round(parseFloat(route.id)).toString();
+                    } catch (e) {
+                        routeId = route.id;
+                    }
+                    const routeTitle = `Route ${routeId}${route.location ? ` (${route.location})` : ''}`;
+                    routeHeader.textContent = routeTitle;
+
+                    // Create route content
+                    const routeContent = document.createElement('div');
+                    routeContent.className = 'route-content';
+
+                    // Prepare customer coordinates for route link
+                    const customersJSON = JSON.stringify(route.customers.map(c => ({lat: c.lat, lng: c.lng})));
+
+                    // Use extracted duration and distance values if available, otherwise use calculated values
+                    const distanceKm = route.extracted_distance !== null ? route.extracted_distance : routeInfo.totalDistanceKm;
+
+                    let durationHours, durationMinutes;
+                    if (route.extracted_duration !== null) {
+                        durationMinutes = route.extracted_duration;
+                        durationHours = (durationMinutes / 60).toFixed(2);
+                    } else {
+                        durationHours = routeInfo.totalDurationHours;
+                        durationMinutes = Math.floor(routeInfo.totalDurationMinutes);
+                    }
+
+                    // Add route details
+                    let routeHtml = `
+                        <p><strong>Stops:</strong> ${route.customers.length}</p>
+                        <p><strong>Distance:</strong> ${distanceKm} km</p>
+                        <p><strong>Duration:</strong> ${durationHours} hours (${durationMinutes} min)</p>`;
+
+                    // Add warning if some segments couldn't be mapped
+                    if (routeInfo.validSegments < routeInfo.totalSegments) {
+                        const unmapped = routeInfo.totalSegments - routeInfo.validSegments;
+                        routeHtml += `<p><strong style="color:orange;">Note:</strong> ${unmapped} of ${routeInfo.totalSegments} segments couldn't be mapped</p>`;
+                    }
+
+                    routeHtml += `<p><a href="#" class="here-link" data-route-id="${route.id}" data-depot-lat="${route.depot.lat}" data-depot-lng="${route.depot.lng}" data-customers='${customersJSON}'>Open in HERE Maps</a></p>`;
+
+                    routeContent.innerHTML = routeHtml;
+
+                    // Assemble card
+                    routeCard.appendChild(routeHeader);
+                    routeCard.appendChild(routeContent);
+
+                    return routeCard;
+                }
+
+                // Add click handlers for the HERE Maps links
+                document.addEventListener('click', function(e) {
+                    if (e.target.classList.contains('here-link')) {
+                        e.preventDefault();
+                        const routeId = e.target.getAttribute('data-route-id');
+                        const depotLat = parseFloat(e.target.getAttribute('data-depot-lat'));
+                        const depotLng = parseFloat(e.target.getAttribute('data-depot-lng'));
+                        const customersCoords = JSON.parse(e.target.getAttribute('data-customers'));
+
+                        // Base HERE Maps URL
+                        let baseUrl = "https://wego.here.com/directions/drive/";
+
+                        // Start with depot location
+                        baseUrl += `${depotLat},${depotLng}/`;
+
+                        // Add waypoints (customer stops) if available
+                        if (customersCoords && customersCoords.length > 0) {
+                            // Add each customer as a waypoint
+                            for (let i = 0; i < customersCoords.length; i++) {
+                                const customer = customersCoords[i];
+                                baseUrl += `${customer.lat},${customer.lng}/`;
+                            }
+
+                            // End back at depot (round trip)
+                            baseUrl += `${depotLat},${depotLng}`;
+                        }
+
+                        // Open in new tab/window
+                        window.open(baseUrl, '_blank');
+                    }
+                });
+
+                // Keep the original function for backward compatibility
+                window.openInHEREMaps = function(routeId, depotLat, depotLng, customersCoords) {
+                    // Base HERE Maps URL
+                    let baseUrl = "https://wego.here.com/directions/drive/";
+
+                    // Start with depot location
+                    baseUrl += `${depotLat},${depotLng}/`;
+
+                    // Add waypoints (customer stops) if available
+                    if (customersCoords && customersCoords.length > 0) {
+                        // Add each customer as a waypoint
+                        for (let i = 0; i < customersCoords.length; i++) {
+                            const customer = customersCoords[i];
+                            baseUrl += `${customer.lat},${customer.lng}/`;
+                        }
+
+                        // End back at depot (round trip)
+                        baseUrl += `${depotLat},${depotLng}`;
+                    }
+
+                    // Open in new tab/window
+                    window.open(baseUrl, '_blank');
+                    return false;
+                };
+
+                // Add routes to the map
+                async function addRoutesToMap() {
+                    updateStatus("Adding routes to the map...");
+
+                    const routeList = document.getElementById('route-list');
+                    const allPoints = [];  // For calculating map bounds
+
+                    // Process each route
+                    for (const route of actualRouteData) {
+                        // Add depot marker
+                        if (route.depot) {
+                            const depot = route.depot;
+                            allPoints.push({lat: depot.lat, lng: depot.lng});
+
+                            try {
+                                // Create depot marker
+                                createDepotMarker(depot, route.id, route.color);
+                            } catch (e) {
+                                updateStatus(`Error adding depot marker for route ${route.id}: ${e.message}`);
+                            }
+                        }
+
+                        // Add customer markers
+                        route.customers.forEach((customer, index) => {
+                            try {
+                                allPoints.push({lat: customer.lat, lng: customer.lng});
+
+                                // Create customer marker directly adding to the map
+                                createCustomerMarker(customer, index, route.id, route.color);
+                            } catch (e) {
+                                updateStatus(`Error adding customer marker: ${e.message}`);
+                            }
+                        });
+
+                        // Draw the route using pre-calculated data only
+                        try {
+                            const routeInfo = await renderPreCalculatedRoute(route);
+
+                            // Create route card in sidebar
+                            const routeCard = createRouteCard(route, routeInfo);
+                            routeList.appendChild(routeCard);
+
+                            updateStatus(`Route ${route.id} processed: ${routeInfo.totalDistanceKm} km, ${routeInfo.totalDurationMinutes} minutes`);
+                        } catch (error) {
+                            updateStatus(`Skipping route ${route.id}: ${error.message}`);
+                        }
+                    }
+
+                    // Set up info bubbles for markers
+                    const bubble = new H.ui.InfoBubble({ lat: 0, lng: 0 }, {
+                        content: ''
+                    });
+                    bubble.close();
+                    ui.addBubble(bubble);
+
+                    map.addEventListener('tap', function(evt) {
+                        if (evt.target instanceof H.map.Marker || evt.target instanceof H.map.DomMarker) {
+                            bubble.setPosition(evt.target.getGeometry());
+                            bubble.setContent(evt.target.getData());
+                            bubble.open();
+                        } else {
+                            bubble.close();
+                        }
+                    });
+
+                    // Calculate bounding box to fit all points
+                    if (allPoints.length > 0) {
+                        const lats = allPoints.map(p => p.lat);
+                        const lngs = allPoints.map(p => p.lng);
+
+                        const minLat = Math.min(...lats);
+                        const maxLat = Math.max(...lats);
+                        const minLng = Math.min(...lngs);
+                        const maxLng = Math.max(...lngs);
+
+                        // Calculate bounding box to fit all points with padding
+                        const bbox = new H.geo.Rect(
+                            maxLat + 0.1, // North
+                            minLng - 0.1, // West
+                            minLat - 0.1, // South
+                            maxLng + 0.1  // East
+                        );
+
+                        // Fit map view to the bounding box
+                        map.getViewModel().setLookAtData({
+                            bounds: bbox
+                        }, true);
+                    } else {
+                        // Default to Estonia if no points are available
+                        map.setCenter({ lat: 58.5953, lng: 25.0136 });
+                        map.setZoom(7);
+                    }
+
+                    updateStatus("All routes have been processed");
+                }
+
+                // Start adding routes to the map
+                addRoutesToMap();
+
+                // Resize map when window size changes
+                window.addEventListener('resize', () => map.getViewPort().resize());
+
+            } catch (e) {
+                updateStatus(`ERROR initializing map: ${e.message}`);
+                console.error(e);
+            }
+        </script>
+    </body>
+    </html>
+    
